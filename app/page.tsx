@@ -244,7 +244,7 @@ export default function LandingPage() {
       
       {/* WhatsApp Floating Button */}
       <motion.a
-        href="https://wa.me/5511999999999?text=Olá!%20Gostaria%20de%20saber%20mais%20sobre%20o%20Gravador%20Médico"
+        href="https://wa.me/5521981470758?text=Olá!%20Tenho%20interesse%20no%20Gravador%20Médico.%20Gostaria%20de%20tirar%20algumas%20dúvidas."
         target="_blank"
         rel="noopener noreferrer"
         className="fixed bottom-6 right-6 z-50 bg-[#25D366] hover:bg-[#20BA5A] text-white rounded-full p-2.5 shadow-2xl transition-all duration-300 group"
@@ -312,13 +312,15 @@ export default function LandingPage() {
           <div className="hidden md:flex items-center gap-4">
             {/* Login button for existing customers */}
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Link
-                href="/login"
+              <a
+                href="https://gravadormedico.com"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="flex items-center gap-2 text-brand-600 hover:text-brand-700 font-semibold transition-colors text-sm lg:text-base group"
               >
                 <LogIn className="w-4 h-4 lg:w-5 lg:h-5 group-hover:rotate-12 transition-transform" />
                 <span>Entrar</span>
-              </Link>
+              </a>
             </motion.div>
             
             {/* CTA button to checkout */}
@@ -408,14 +410,16 @@ export default function LandingPage() {
 
                   <div className="mt-8 space-y-3">
                     {/* Login */}
-                    <Link
-                      href="/login"
+                    <a
+                      href="https://gravadormedico.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
                       onClick={() => setMobileMenuOpen(false)}
                       className="flex items-center justify-center gap-2 w-full px-6 py-3 border-2 border-brand-500 text-brand-600 rounded-full font-bold hover:bg-brand-50 transition-all"
                     >
                       <LogIn className="w-5 h-5" />
                       Entrar
-                    </Link>
+                    </a>
 
                     {/* CTA */}
                     <a
@@ -746,13 +750,13 @@ export default function LandingPage() {
                 <div className="relative bg-white rounded-2xl md:rounded-3xl border-4 border-brand-500 shadow-2xl overflow-hidden">
                   
                   {/* Header verde */}
-                  <div className="bg-gradient-to-br from-brand-600 to-brand-500 text-white text-center py-6 px-4">
+                  <div className="bg-gradient-to-br from-brand-600 to-brand-500 text-white text-center py-5 px-4">
                     <h3 className="text-2xl md:text-3xl lg:text-4xl font-black mb-2">GRAVADOR MÉDICO</h3>
                     <p className="text-base md:text-lg font-medium">Método Completo + Bônus</p>
                   </div>
 
                   {/* Conteúdo */}
-                  <div className="p-6 md:p-8 space-y-6">
+                  <div className="p-5 md:p-7 space-y-5">
                     
                     {/* Preços */}
                     <div className="text-center space-y-2">
@@ -765,22 +769,20 @@ export default function LandingPage() {
                     </div>
 
                     {/* Lista de benefícios */}
-                    <div className="space-y-3">
+                    <div className="space-y-2.5">
                       {[
                         'Método completo de transcrição automática',
                         'Configuração do Atalho Mágico no iPhone',
-                        'Técnica de Gravação Discreta durante consultas',
                         'Prompt IA personalizado para prontuários',
-                        'Casos práticos reais de especialidades médicas',
                         '4 Bônus Exclusivos para Potencializar seu Método',
                         'Acesso vitalício com atualizações gratuitas',
                         'Garantia incondicional de 7 dias'
                       ].map((item, index) => (
                         <div key={index} className="flex items-start gap-3">
-                          <div className="flex-shrink-0 w-6 h-6 rounded-full bg-brand-100 flex items-center justify-center mt-0.5">
-                            <Check className="w-4 h-4 text-brand-600" />
+                          <div className="flex-shrink-0 w-5 h-5 rounded-full bg-brand-100 flex items-center justify-center mt-0.5">
+                            <Check className="w-3.5 h-3.5 text-brand-600" />
                           </div>
-                          <p className="text-gray-700 text-sm md:text-base leading-snug">{item}</p>
+                          <p className="text-gray-700 text-sm md:text-base leading-snug text-left">{item}</p>
                         </div>
                       ))}
                     </div>
@@ -2487,13 +2489,13 @@ export default function LandingPage() {
               <div className="relative bg-white rounded-2xl md:rounded-3xl border-4 border-brand-500 shadow-2xl overflow-hidden">
                 
                 {/* Header verde */}
-                <div className="bg-gradient-to-br from-brand-600 to-brand-500 text-white text-center py-6 px-4">
+                <div className="bg-gradient-to-br from-brand-600 to-brand-500 text-white text-center py-5 px-4">
                   <h3 className="text-2xl md:text-3xl lg:text-4xl font-black mb-2">GRAVADOR MÉDICO</h3>
                   <p className="text-base md:text-lg font-medium">Método Completo + Bônus</p>
                 </div>
 
                 {/* Conteúdo */}
-                <div className="p-6 md:p-8 space-y-6">
+                <div className="p-5 md:p-7 space-y-5">
                   
                   {/* Preços */}
                   <div className="text-center space-y-2">
@@ -2506,22 +2508,20 @@ export default function LandingPage() {
                   </div>
 
                   {/* Lista de benefícios */}
-                  <div className="space-y-3">
+                  <div className="space-y-2.5">
                     {[
                       'Método completo de transcrição automática',
                       'Configuração do Atalho Mágico no iPhone',
-                      'Técnica de Gravação Discreta durante consultas',
                       'Prompt IA personalizado para prontuários',
-                      'Casos práticos reais de especialidades médicas',
                       '4 Bônus Exclusivos para Potencializar seu Método',
                       'Acesso vitalício com atualizações gratuitas',
                       'Garantia incondicional de 7 dias'
                     ].map((item, index) => (
                       <div key={index} className="flex items-start gap-3">
-                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-brand-100 flex items-center justify-center mt-0.5">
-                          <Check className="w-4 h-4 text-brand-600" />
+                        <div className="flex-shrink-0 w-5 h-5 rounded-full bg-brand-100 flex items-center justify-center mt-0.5">
+                          <Check className="w-3.5 h-3.5 text-brand-600" />
                         </div>
-                        <p className="text-gray-700 text-sm md:text-base leading-snug">{item}</p>
+                        <p className="text-gray-700 text-sm md:text-base leading-snug text-left">{item}</p>
                       </div>
                     ))}
                   </div>
@@ -2703,7 +2703,7 @@ export default function LandingPage() {
               className="inline-block"
             >
               <a
-                href="https://wa.me/5511999999999"
+                href="https://wa.me/5521981470758?text=Olá!%20Preciso%20de%20suporte%20com%20o%20Gravador%20Médico."
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-3 px-8 py-4 bg-white border-2 border-white text-brand-600 rounded-2xl font-bold text-lg hover:bg-brand-50 transition-all shadow-md hover:shadow-lg"
