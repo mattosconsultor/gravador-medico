@@ -1,6 +1,6 @@
 /**
  * Integração com APPMAX - Gateway de Pagamento Próprio
- * Documentação: https://homolog.sandboxappmax.com.br/api/v3/
+ * Documentação: https://docs.appmax.com.br/api/
  * 
  * IMPORTANTE: O token vai NO CORPO da requisição como "access-token"
  * 
@@ -10,8 +10,8 @@
  * 3. Processar Pagamento (Payment) -> retorna status
  */
 
-// Configuração da Appmax
-const APPMAX_API_URL = process.env.APPMAX_API_URL || 'https://api.appmax.com.br'
+// Configuração da Appmax - ENDPOINT OFICIAL V3
+const APPMAX_API_URL = 'https://admin.appmax.com.br/api/v3'
 const APPMAX_API_TOKEN = process.env.APPMAX_API_TOKEN || ''
 const APPMAX_PRODUCT_ID = process.env.APPMAX_PRODUCT_ID || '32880073'
 
@@ -79,7 +79,7 @@ export interface AppmaxOrderResponse {
 export async function createAppmaxOrder(data: AppmaxOrderRequest): Promise<AppmaxOrderResponse> {
   try {
     // ETAPA 1: Criar Cliente
-    const customerResponse = await fetch(`${APPMAX_API_URL}/api/v3/customer`, {
+    const customerResponse = await fetch(`${APPMAX_API_URL}/customer`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -144,6 +144,7 @@ export async function createAppmaxOrder(data: AppmaxOrderRequest): Promise<Appma
         name: 'Gravador Médico - Acesso Vitalício',
         qty: 1,
         price: 36.00,
+        digital_product: 1, // INFOPRODUTO
       },
     ]
 
@@ -155,11 +156,12 @@ export async function createAppmaxOrder(data: AppmaxOrderRequest): Promise<Appma
           name: `Order Bump ${bump.product_id}`,
           qty: bump.quantity,
           price: bump.quantity === 1 ? 147.00 : 97.00, // TODO: mapear preços corretos
+          digital_product: 1, // INFOPRODUTO
         })
       }
     }
 
-    const orderResponse = await fetch(`${APPMAX_API_URL}/api/v3/order`, {
+    const orderResponse = await fetch(`${APPMAX_API_URL}/order`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -170,6 +172,7 @@ export async function createAppmaxOrder(data: AppmaxOrderRequest): Promise<Appma
         customer_id: customerId,
         shipping: 0, // Produto digital
         discount: 0,
+        digital_product: 1, // IMPORTANTE: Marca como infoproduto
       }),
     })
 
@@ -185,7 +188,7 @@ export async function createAppmaxOrder(data: AppmaxOrderRequest): Promise<Appma
     let paymentResponse
     
     if (data.payment_method === 'pix') {
-      paymentResponse = await fetch(`${APPMAX_API_URL}/api/v3/payment/pix`, {
+      paymentResponse = await fetch(`${APPMAX_API_URL}/payment/pix`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -201,7 +204,7 @@ export async function createAppmaxOrder(data: AppmaxOrderRequest): Promise<Appma
         }),
       })
     } else if (data.payment_method === 'credit_card' && data.card_data) {
-      paymentResponse = await fetch(`${APPMAX_API_URL}/api/v3/payment/credit-card`, {
+      paymentResponse = await fetch(`${APPMAX_API_URL}/payment/credit-card`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
