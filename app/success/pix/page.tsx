@@ -65,7 +65,7 @@ function PixSuccessContent() {
         </div>
 
         {/* QR Code */}
-        {qrCode && (
+        {qrCode ? (
           <div className="space-y-6">
             <div className="flex flex-col items-center">
               <h2 className="text-xl font-bold text-gray-900 mb-4">
@@ -73,7 +73,7 @@ function PixSuccessContent() {
               </h2>
               <div className="bg-white p-4 rounded-xl border-4 border-brand-500 shadow-lg">
                 <QRCodeSVG
-                  value={qrCode}
+                  value={qrCode || ''}
                   size={256}
                   level="H"
                   includeMargin={true}
@@ -89,7 +89,7 @@ function PixSuccessContent() {
               <div className="flex gap-2">
                 <input
                   type="text"
-                  value={qrCode}
+                  value={qrCode || ''}
                   readOnly
                   className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg font-mono text-sm bg-gray-50"
                 />
@@ -151,11 +151,28 @@ function PixSuccessContent() {
               </a>
             </div>
           </div>
-        )}
-
-        {!qrCode && (
-          <div className="text-center text-red-600">
-            <p>Erro ao gerar QR Code PIX. Entre em contato com o suporte.</p>
+        ) : (
+          <div className="bg-blue-50 border-l-4 border-blue-400 p-6 rounded-lg">
+            <div className="flex items-start gap-3">
+              <Clock className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <h3 className="font-semibold text-blue-800 mb-2">
+                  QR Code PIX sendo gerado...
+                </h3>
+                <p className="text-sm text-blue-700 mb-4">
+                  Seu pedido foi criado com sucesso! O QR Code está sendo processado pela Appmax.
+                  Você receberá o código de pagamento por email em instantes.
+                </p>
+                <div className="text-center pt-4">
+                  <a
+                    href="/"
+                    className="text-brand-600 hover:text-brand-700 font-semibold underline"
+                  >
+                    ← Voltar para o site
+                  </a>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
