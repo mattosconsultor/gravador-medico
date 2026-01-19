@@ -82,33 +82,33 @@ export default function CheckoutPage() {
   // Order Bumps
   const orderBumps = [
     {
-      id: "32989468", // ID do produto na Appmax
-      title: "🎯 Pacote VIP: Consultoria Personalizada",
-      description: "30 minutos de consultoria individual para otimizar seu método + Setup completo feito por especialista",
-      originalPrice: 497,
-      price: 147,
-      discount: 70,
+      id: "32989468", // Conteúdo Infinito Instagram
+      title: "🎯 Conteúdo Infinito para Instagram",
+      description: "Templates prontos + Calendário editorial + Ideias infinitas de posts para suas redes sociais",
+      originalPrice: 97,
+      price: 29.90,
+      discount: 69,
       highlight: "MAIS VENDIDO",
       badge: "LIMITADO",
     },
     {
-      id: "32989503", // ID do produto na Appmax
-      title: "📚 Biblioteca Premium: 50+ Modelos Prontos",
-      description: "Modelos de prontuários para 20+ especialidades + Scripts de anamnese otimizados + Atualizações vitalícias",
+      id: "32989503", // Implementação Assistida
+      title: "📚 Implementação Assistida",
+      description: "Instalação completa do sistema + Configuração personalizada + 1 hora de treinamento individual",
       originalPrice: 297,
       price: 97,
       discount: 67,
-      highlight: "ECONOMIZE HORAS",
+      highlight: "ECONOMIZE TEMPO",
       badge: "EXCLUSIVO",
     },
     {
-      id: "32989520", // ID do produto na Appmax
-      title: "⚡ Treinamento Avançado + Suporte Prioritário",
-      description: "3 meses de suporte prioritário via WhatsApp + Acesso ao grupo VIP de médicos + Treinamento ao vivo semanal",
-      originalPrice: 397,
-      price: 127,
-      discount: 68,
-      highlight: "ACELERE RESULTADOS",
+      id: "32989520", // Análise Inteligente
+      title: "⚡ Análise Inteligente de Consultas",
+      description: "IA que analisa seus atendimentos + Sugestões de melhoria + Relatórios automáticos de performance",
+      originalPrice: 197,
+      price: 39.90,
+      discount: 80,
+      highlight: "TECNOLOGIA IA",
       badge: "PREMIUM",
     },
   ]

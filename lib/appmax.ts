@@ -17,17 +17,17 @@ const APPMAX_PRODUCT_ID = process.env.APPMAX_PRODUCT_ID || '32991339'
 
 // Order Bumps IDs
 const BUMP_IDS = {
-  CONSULTORIA: process.env.APPMAX_ORDER_BUMP_1_ID || '32989468', // R$ 147
-  BIBLIOTECA: process.env.APPMAX_ORDER_BUMP_2_ID || '32989503',  // R$ 97
-  SUPORTE: process.env.APPMAX_ORDER_BUMP_3_ID || '32989520',     // R$ 197
+  CONSULTORIA: process.env.APPMAX_ORDER_BUMP_1_ID || '32989468', // Conteúdo Infinito Instagram
+  BIBLIOTECA: process.env.APPMAX_ORDER_BUMP_2_ID || '32989503',  // Implementação Assistida
+  SUPORTE: process.env.APPMAX_ORDER_BUMP_3_ID || '32989520',     // Análise Inteligente
 }
 
-// Preços dos produtos (para cálculo do total)
+// Preços dos produtos (conforme cadastrados na Appmax)
 const PRICES = {
   MAIN: 36.00,
-  [BUMP_IDS.CONSULTORIA]: 147.00,
-  [BUMP_IDS.BIBLIOTECA]: 97.00,
-  [BUMP_IDS.SUPORTE]: 197.00,
+  '32989468': 29.90,  // Conteúdo Infinito Instagram
+  '32989503': 97.00,  // Implementação Assistida
+  '32989520': 39.90,  // Análise Inteligente
 }
 
 interface UTMParams {
@@ -260,29 +260,40 @@ export async function createAppmaxOrder(data: AppmaxOrderRequest): Promise<Appma
     console.log('✅ Pedido criado:', orderId)
 
     // ETAPA 3: Processar Pagamento
+    console.log('='.repeat(80))
+    console.log('💳 INICIANDO PROCESSAMENTO DE PAGAMENTO PIX')
+    console.log('='.repeat(80))
+    
     let paymentResponse
     
     if (data.payment_method === 'pix') {
+      const pixPayload = {
+        'access-token': APPMAX_API_TOKEN,
+        cart: {
+          order_id: orderId,
+        },
+        customer: {
+          customer_id: customerId,
+        },
+        payment: {
+          pix: {
+            document_number: data.customer.cpf?.replace(/\D/g, '') || '',
+          },
+        },
+      }
+      
+      console.log('📤 Payload PIX:', JSON.stringify(pixPayload, null, 2))
+      console.log('🌐 URL:', `${APPMAX_API_URL}/payment/pix`)
+      
       paymentResponse = await fetch(`${APPMAX_API_URL}/payment/pix`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          'access-token': APPMAX_API_TOKEN,
-          cart: {
-            order_id: orderId,
-          },
-          customer: {
-            customer_id: customerId,
-          },
-          payment: {
-            pix: {
-              document_number: data.customer.cpf?.replace(/\D/g, '') || '',
-            },
-          },
-        }),
+        body: JSON.stringify(pixPayload),
       })
+      
+      console.log('📊 Status da resposta PIX:', paymentResponse.status, paymentResponse.statusText)
     } else if (data.payment_method === 'credit_card' && data.card_data) {
       paymentResponse = await fetch(`${APPMAX_API_URL}/payment/credit-card`, {
         method: 'POST',
@@ -341,15 +352,12 @@ export async function createAppmaxOrder(data: AppmaxOrderRequest): Promise<Appma
     console.log(JSON.stringify(paymentResult, null, 2))
     console.log('='.repeat(80))
     
-    // Verifica se a resposta indica sucesso
-    const isSuccess = paymentResult.success !== false && 
-                     (paymentResult.status === 'success' || 
-                      paymentResult.data?.status === 'success' ||
-                      !paymentResult.status)
-    
-    if (!isSuccess) {
-      const errorMsg = paymentResult.message || paymentResult.error || 'Erro desconhecido no pagamento'
-      console.error('❌ Pagamento não foi bem-sucedido:', errorMsg)
+    // Para PIX, a Appmax só retorna os dados do pagamento
+    // Não há "status: success", apenas os campos do PIX
+    // Se veio erro explícito, lança exceção
+    if (paymentResult.success === false || paymentResult.error) {
+      const errorMsg = paymentResult.message || paymentResult.error || 'Erro ao processar pagamento'
+      console.error('❌ Pagamento retornou erro:', errorMsg)
       throw new Error(errorMsg)
     }
     
