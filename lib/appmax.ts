@@ -327,23 +327,22 @@ export async function createAppmaxOrder(data: AppmaxOrderRequest): Promise<Appma
     console.log(JSON.stringify(paymentResult, null, 2))
     console.log('='.repeat(80))
     
-    // A API Appmax retorna uma URL de redirecionamento para a página de pagamento PIX
-    // Exemplo: https://pay.appmax.com.br/pix/[hash]
-    let redirectUrl = paymentResult.redirect_url || 
-                      paymentResult.data?.redirect_url ||
-                      paymentResult.url ||
-                      paymentResult.data?.url ||
-                      paymentResult.payment_url ||
-                      paymentResult.data?.payment_url
+    // A API Appmax retorna um link "pix_payment_link" para a página de pagamento
+    // Exemplo: http://admin.appmax.com.br/show-pix/105547443
+    const redirectUrl = paymentResult.pix_payment_link || 
+                        paymentResult.data?.pix_payment_link ||
+                        paymentResult.redirect_url || 
+                        paymentResult.data?.redirect_url ||
+                        paymentResult.url ||
+                        paymentResult.data?.url
     
-    // Se não retornou URL, constrói manualmente baseado no order_id
-    // Formato padrão Appmax: https://pay.appmax.com.br/purchase/[order_id]
+    console.log('🔗 URL de redirecionamento:', redirectUrl)
+    
     if (!redirectUrl) {
-      redirectUrl = `https://pay.appmax.com.br/purchase/${orderId}`
-      console.log('⚠️ URL não retornada, construindo manualmente:', redirectUrl)
+      console.error('⚠️ NENHUMA URL retornada pela API!')
     }
     
-    // Também pode retornar o QR Code diretamente (menos provável)
+    // Também captura o QR Code se vier (improvável)
     const pixQrCode = paymentResult.pix_qrcode || 
                       paymentResult.pix_qr_code || 
                       paymentResult.data?.pix_qrcode ||
