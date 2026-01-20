@@ -240,64 +240,7 @@ export async function fetchSalesByDay(
 }
 
 // ========================================
-// 8. Fetch: Vendas por origem/UTM
-// ========================================
-export async function fetchSalesBySource(
-  supabase: SupabaseClient,
-  startDate: string,
-  endDate: string
-) {
-  try {
-    const { startIso, endIso } = createDateRange(startDate, endDate)
-    
-    // Query manual com agrupamento
-    const { data, error } = await supabase
-      .from('sales')
-      .select('utm_source, utm_campaign, utm_medium, total_amount')
-      .in('status', ['approved', 'paid', 'completed'])
-      .gte('created_at', startIso)
-      .lte('created_at', endIso)
-    
-    if (error) throw error
-    
-    // Agrupar manualmente no frontend (ou usar view)
-    const grouped = (data || []).reduce((acc: any[], sale) => {
-      const source = sale.utm_source || 'direct'
-      const campaign = sale.utm_campaign || 'none'
-      const medium = sale.utm_medium || 'none'
-      const key = `${source}-${campaign}-${medium}`
-      
-      const existing = acc.find(item => item.key === key)
-      if (existing) {
-        existing.total_orders++
-        existing.total_revenue += Number(sale.total_amount)
-      } else {
-        acc.push({
-          key,
-          source,
-          campaign,
-          medium,
-          total_orders: 1,
-          total_revenue: Number(sale.total_amount),
-        })
-      }
-      
-      return acc
-    }, [])
-    
-    return { 
-      data: grouped.sort((a, b) => b.total_revenue - a.total_revenue),
-      error: null 
-    }
-    
-  } catch (error) {
-    console.error('❌ Erro ao buscar vendas por origem:', error)
-    return { data: [], error }
-  }
-}
-
-// ========================================
-// 9. Fetch: Métricas gerais do dashboard
+// 8. Fetch: Métricas gerais do dashboard
 // ========================================
 export async function fetchDashboardMetrics(
   supabase: SupabaseClient,
@@ -347,7 +290,7 @@ export async function fetchDashboardMetrics(
 }
 
 // ========================================
-// 10. Fetch: Top produtos por receita
+// 9. Fetch: Top produtos por receita
 // ========================================
 export async function fetchTopProducts(
   supabase: SupabaseClient,
@@ -408,7 +351,7 @@ export async function fetchTopProducts(
 }
 
 // ========================================
-// 11. Fetch: Vendas por fonte (UTM)
+// 10. Fetch: Vendas por fonte (UTM) - usando VIEW
 // ========================================
 export async function fetchSalesBySource(
   supabase: SupabaseClient,

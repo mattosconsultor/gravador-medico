@@ -31,7 +31,7 @@ export async function syncCustomerFromAppmax(
     // 1. Tentar encontrar cliente existente por email ou appmax_customer_id
     let { data: existing, error: searchError } = await supabase
       .from('customers')
-      .select('id, email, appmax_customer_id')
+      .select('id, email, appmax_customer_id, phone, cpf, utm_source, utm_campaign, utm_medium')
       .or(`email.eq.${appmaxData.email},appmax_customer_id.eq.${appmaxData.customer_id || ''}`)
       .limit(1)
       .maybeSingle()
@@ -122,7 +122,7 @@ export async function syncProductFromAppmax(
     // 1. Tentar encontrar produto existente por SKU ou appmax_product_id
     const { data: existing, error: searchError } = await supabase
       .from('products')
-      .select('id, sku, appmax_product_id')
+      .select('id, sku, appmax_product_id, type')
       .or(`sku.eq.${productData.sku},appmax_product_id.eq.${productData.product_id || ''}`)
       .limit(1)
       .maybeSingle()
