@@ -1,19 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createOrUpdateUser, supabaseAdmin } from '@/lib/supabase'
+import { createClient } from '@supabase/supabase-js'
 
 /**
- * Webhook da APPMAX - VERSÃO 2.0
+ * Webhook da APPMAX - VERSÃO 3.0 BLINDADA
  * 
- * Agora salva TUDO no Supabase para Dashboard Admin:
- * 1. Log completo do webhook (auditoria)
- * 2. Dados da venda (sales)
- * 3. Itens da venda (sales_items)
- * 4. Usuário com acesso (users)
+ * ✅ Usa Service Role Key para ignorar RLS
+ * ✅ Trata todos os eventos: OrderCreated, OrderPaid, PaymentAuthorized
+ * ✅ UPSERT para evitar duplicatas
+ * ✅ Extração segura (funciona mesmo se customer vier null)
+ * ✅ Logs detalhados para debug
  * 
- * Configurado na APPMAX:
  * URL: https://www.gravadormedico.com.br/api/webhook/appmax
- * Status: ATIVO ✅
  */
+
+// Cliente Supabase ADMIN (ignora RLS e salva sempre)
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  }
+)
+
+// Mapeia status da Appmax para nosso banco
+function mapStatusToDatabase(appmaxStatus: string): string {
+  const statusMap: Record<string, string> = {
+    'pending': 'pending',
+    'approved': 'approved',
+    'paid': 'approved',
+    'processing': 'pending',
+    'refunded': 'refunded',
+    'canceled': 'refused',
+    'payment_not_authorized': 'refused',
+    'refused': 'refused',
+  }
+  return statusMap[appmaxStatus.toLowerCase()] || 'pending'
+}
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
@@ -21,203 +46,112 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
-    console.log('📥 Webhook APPMAX recebido:', JSON.stringify(body, null, 2))
+    console.log('🔔 Webhook APPMAX - Evento:', body.event || 'unknown')
+    console.log('📥 Payload:', JSON.stringify(body, null, 2))
 
-    // Pegar IP de origem
-    const forwardedFor = request.headers.get('x-forwarded-for')
-    const realIp = request.headers.get('x-real-ip')
-    const userAgent = request.headers.get('user-agent')
-    const ipAddress = forwardedFor || realIp || 'unknown'
+    // IP de origem
+    const ipAddress = request.headers.get('x-forwarded-for') || 
+                     request.headers.get('x-real-ip') || 
+                     'unknown'
     
-    console.log('🔐 IP origem:', ipAddress)
+    console.log('🔐 IP:', ipAddress)
 
-    // 1️⃣ SALVAR LOG DO WEBHOOK (AUDITORIA)
-    const { data: webhookLog, error: logError } = await supabaseAdmin
+    // 1️⃣ SALVAR LOG (AUDITORIA)
+    const { data: webhookLog } = await supabaseAdmin
       .from('webhooks_logs')
       .insert({
         source: 'appmax',
         event_type: body.event || body.status || 'unknown',
         ip_address: ipAddress,
-        user_agent: userAgent,
+        user_agent: request.headers.get('user-agent'),
         payload: body,
         processed: false,
       })
       .select()
       .single()
 
-    if (logError) {
-      console.error('❌ Erro ao salvar log:', logError)
-      // Não retorna erro, continua processando
-    } else {
-      console.log('✅ Log salvo:', webhookLog.id)
+    console.log('✅ Log salvo:', webhookLog?.id)
+
+    // 2️⃣ EXTRAÇÃO SEGURA DE DADOS
+    const data = body.data || body.order || body
+    
+    if (!data.id && !body.order_id && !body.id) {
+      console.log('⚠️ Webhook sem ID - Ignorando')
+      return NextResponse.json({ message: 'Sem ID' }, { status: 200 })
     }
 
-    // Validação básica
-    if (!body || typeof body !== 'object') {
-      console.error('❌ Webhook inválido: corpo não é objeto')
-      
-      // Atualizar log como erro
-      if (webhookLog?.id) {
-        await supabaseAdmin
-          .from('webhooks_logs')
-          .update({
-            processed: true,
-            success: false,
-            error_message: 'Corpo não é objeto válido',
-            processed_at: new Date().toISOString(),
-          })
-          .eq('id', webhookLog.id)
-      }
-      
-      return NextResponse.json({ error: 'Invalid payload' }, { status: 400 })
-    }
+    const orderId = (data.id || body.order_id || body.id)?.toString()
 
-    // 2️⃣ EXTRAIR DADOS DO WEBHOOK
-    const customerEmail = 
-      body.customer?.email || 
-      body.order?.customer?.email || 
-      body.email ||
-      body.lead?.email
+    // Cliente (pode vir null)
+    const customer = data.customer || body.customer || {}
+    const customerName = customer.firstname 
+      ? `${customer.firstname} ${customer.lastname || ''}`.trim()
+      : (customer.name || body.name || 'Cliente Desconhecido')
+    
+    const customerEmail = customer.email || body.email || 'email@naoinformado.com'
+    const customerPhone = customer.telephone || customer.phone || body.phone || null
+    const customerCpf = customer.cpf || body.cpf || null
 
-    const customerName = 
-      body.customer?.name || 
-      body.order?.customer?.name || 
-      body.name ||
-      (body.firstname ? `${body.firstname} ${body.lastname || ''}`.trim() : null) ||
-      body.lead?.name
+    // Status e Valores
+    const rawStatus = data.status || body.status || 'pending'
+    const orderStatus = mapStatusToDatabase(rawStatus)
+    
+    const totalAmount = parseFloat(data.total || data.full_payment_amount || body.total || body.amount || 0)
+    const discount = parseFloat(data.discount || body.discount || 0)
+    const paymentMethod = (data.payment_type || data.payment_method || body.payment_method || 'pix').toLowerCase()
 
-    const customerPhone = 
-      body.customer?.phone || 
-      body.order?.customer?.phone || 
-      body.phone ||
-      body.telephone
-
-    const customerCpf = 
-      body.customer?.cpf || 
-      body.order?.customer?.cpf || 
-      body.cpf
-
-    const orderId = 
-      body.order?.id || 
-      body.order_id || 
-      body.id
-
-    const orderStatus = 
-      body.status || 
-      body.order?.status ||
-      'approved'
-
-    const totalAmount = 
-      parseFloat(body.total || body.order?.total || body.amount || 0)
-
-    const discount = 
-      parseFloat(body.discount || body.order?.discount || 0)
-
-    const paymentMethod = 
-      (body.payment_method || body.order?.payment_method || 'pix').toLowerCase()
-
-    // Produtos (array de itens)
-    const products = body.products || body.order?.products || []
+    // Produtos
+    const products = data.products || body.products || data.items || body.items || []
 
     console.log('📋 Dados extraídos:', {
+      orderId,
       email: customerEmail,
       name: customerName,
-      orderId,
       status: orderStatus,
       total: totalAmount,
       payment: paymentMethod,
-      productsCount: products.length,
+      products: products.length,
     })
 
-    // PROTEÇÃO: Se não houver email, é evento de falha (normal)
-    // Não retornar erro 400, apenas ignorar e retornar 200 para Appmax parar de reenviar
-    if (!customerEmail) {
-      console.log('⚠️ Webhook ignorado: Sem dados de cliente (evento de falha ou PIX expirado)')
-      
-      if (webhookLog?.id) {
-        await supabaseAdmin
-          .from('webhooks_logs')
-          .update({
-            processed: true,
-            success: true, // Sucesso = processado corretamente (ignorado)
-            error_message: 'Evento sem dados de cliente - ignorado (normal para falhas)',
-            processed_at: new Date().toISOString(),
-          })
-          .eq('id', webhookLog.id)
-      }
-      
-      // Retorna 200 para Appmax não reenviar
-      return NextResponse.json(
-        { 
-          message: 'Webhook processado - Evento sem cliente ignorado',
-          event: body.event || body.status || 'unknown'
-        },
-        { status: 200 }
-      )
-    }
-
-    // Só processa se aprovado
-    if (orderStatus !== 'approved' && orderStatus !== 'paid') {
-      console.log('⏭️ Pedido ainda não aprovado, status:', orderStatus)
-      
-      if (webhookLog?.id) {
-        await supabaseAdmin
-          .from('webhooks_logs')
-          .update({
-            processed: true,
-            success: true,
-            error_message: `Pedido com status: ${orderStatus} - aguardando aprovação`,
-            processed_at: new Date().toISOString(),
-          })
-          .eq('id', webhookLog.id)
-      }
-      
-      return NextResponse.json({ message: 'Pedido ainda não aprovado' }, { status: 200 })
-    }
-
-    // 3️⃣ SALVAR VENDA NO SUPABASE
-    console.log('💾 Salvando venda no Supabase...')
+    // 3️⃣ SALVAR VENDA (UPSERT - Cria ou atualiza)
+    console.log('💾 Salvando venda...')
     
     const { data: sale, error: saleError } = await supabaseAdmin
       .from('sales')
-      .insert({
-        appmax_order_id: orderId.toString(),
-        appmax_customer_id: body.customer?.id?.toString() || null,
-        customer_name: customerName || 'Cliente',
+      .upsert({
+        appmax_order_id: orderId,
+        appmax_customer_id: (customer.id || body.customer_id)?.toString() || null,
+        customer_name: customerName,
         customer_email: customerEmail,
         customer_phone: customerPhone,
         customer_cpf: customerCpf,
         total_amount: totalAmount,
         discount: discount,
-        subtotal: totalAmount + discount, // Total antes do desconto
-        status: 'approved',
+        subtotal: totalAmount + discount,
+        status: orderStatus,
         payment_method: paymentMethod as any,
         utm_source: body.tracking?.utm_source || body.utm_source,
         utm_campaign: body.tracking?.utm_campaign || body.utm_campaign,
         utm_medium: body.tracking?.utm_medium || body.utm_medium,
         ip_address: ipAddress,
-        paid_at: new Date().toISOString(),
+        paid_at: orderStatus === 'approved' ? new Date().toISOString() : null,
         metadata: {
           raw_webhook: body,
+          event_type: body.event,
           processing_time_ms: Date.now() - startTime,
         },
+      }, {
+        onConflict: 'appmax_order_id', // Atualiza se já existir
       })
       .select()
       .single()
 
     if (saleError) {
       console.error('❌ Erro ao salvar venda:', saleError)
-      
-      // Se for erro de duplicata (order já existe), retorna sucesso
-      if (saleError.code === '23505') {
-        console.log('⚠️ Pedido duplicado (já processado):', orderId)
-        return NextResponse.json({ message: 'Pedido já processado anteriormente' }, { status: 200 })
-      }
-      
       throw saleError
     }
 
-    console.log('✅ Venda salva:', sale.id)
+    console.log('✅ Venda salva:', sale.id, '- Status:', sale.status)
 
     // 4️⃣ SALVAR ITENS DA VENDA
     if (products && products.length > 0) {
@@ -234,27 +168,18 @@ export async function POST(request: NextRequest) {
 
       const { error: itemsError } = await supabaseAdmin
         .from('sales_items')
-        .insert(salesItems)
+        .upsert(salesItems, {
+          onConflict: 'sale_id,product_id'
+        })
 
       if (itemsError) {
-        console.error('❌ Erro ao salvar itens:', itemsError)
-        // Não falha a operação inteira
+        console.error('⚠️ Erro ao salvar itens:', itemsError)
       } else {
         console.log('✅ Itens salvos')
       }
     }
 
-    // 5️⃣ CRIAR/ATUALIZAR USUÁRIO (lógica antiga - manter compatibilidade)
-    console.log('� Criando/atualizando usuário...')
-    const user = await createOrUpdateUser({
-      email: customerEmail,
-      name: customerName,
-      appmax_customer_id: orderId,
-    })
-
-    console.log('✅ Usuário criado/atualizado:', user?.id)
-
-    // 6️⃣ ATUALIZAR LOG COMO SUCESSO
+    // 5️⃣ ATUALIZAR LOG COMO SUCESSO
     if (webhookLog?.id) {
       await supabaseAdmin
         .from('webhooks_logs')
@@ -270,39 +195,30 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Venda registrada com sucesso',
+      message: 'Venda registrada',
       sale_id: sale.id,
-      user_id: user?.id,
       processing_time_ms: Date.now() - startTime,
     })
 
   } catch (error: any) {
-    console.error('❌ Erro ao processar webhook:', error)
+    console.error('❌ Erro crítico:', error)
     
+    // Retorna 200 para Appmax não ficar reenviando
     return NextResponse.json(
       { 
-        error: 'Erro ao processar webhook', 
+        error: 'Erro processado', 
         message: error.message,
-        processing_time_ms: Date.now() - startTime,
       },
-      { status: 500 }
+      { status: 200 }
     )
   }
 }
 
-/**
- * Endpoint GET para testar
- */
+// Endpoint GET para testar
 export async function GET() {
   return NextResponse.json({
-    message: 'Webhook APPMAX v2.0 - Dashboard Admin',
+    message: 'Webhook APPMAX v3.0 - Blindado',
     timestamp: new Date().toISOString(),
     status: 'operational',
-    features: [
-      'Auditoria completa (webhooks_logs)',
-      'Registro de vendas (sales)',
-      'Itens de venda (sales_items)',
-      'Criação de usuários',
-    ],
   })
 }
