@@ -88,13 +88,13 @@ export default function CheckoutPage() {
     return () => clearInterval(timer)
   }, [])
 
-  // 🎯 REALTIME: Escuta pagamento aprovado no Supabase
+  // 🎯 REALTIME + POLLING: Escuta pagamento aprovado no Supabase
   useEffect(() => {
     if (!pixData?.orderId) return // Só ativa se tiver PIX gerado
 
     console.log('👂 Escutando pagamento do pedido:', pixData.orderId)
 
-    // Cria canal Realtime do Supabase
+    // 1️⃣ Realtime (WebSocket - Método principal)
     const channel = supabase
       .channel(`payment-${pixData.orderId}`)
       .on(
@@ -110,7 +110,7 @@ export default function CheckoutPage() {
           
           const record = payload.new || payload.old
           if (record && (record.status === 'approved' || record.status === 'paid')) {
-            console.log('✅ Pagamento APROVADO! Redirecionando...')
+            console.log('✅ Pagamento APROVADO via Realtime! Redirecionando...')
             
             // Redireciona para página de obrigado
             router.push(`/obrigado?email=${encodeURIComponent(formData.email)}&order_id=${pixData.orderId}`)
@@ -121,9 +121,39 @@ export default function CheckoutPage() {
         console.log('📡 Status da conexão Realtime:', status)
       })
 
+    // 2️⃣ POLLING DE SEGURANÇA (Fallback a cada 3 segundos)
+    const pollingInterval = setInterval(async () => {
+      console.log('🔍 Polling: Verificando status do pagamento...')
+      
+      try {
+        const { data, error } = await supabase
+          .from('sales')
+          .select('status')
+          .eq('appmax_order_id', pixData.orderId)
+          .single()
+
+        if (error) {
+          console.log('⚠️ Polling: Pedido ainda não encontrado no banco')
+          return
+        }
+
+        console.log('📊 Polling: Status atual =', data?.status)
+
+        if (data?.status === 'paid' || data?.status === 'approved') {
+          console.log('✅ Pagamento APROVADO via Polling! Redirecionando...')
+          
+          // Redireciona para página de obrigado
+          router.push(`/obrigado?email=${encodeURIComponent(formData.email)}&order_id=${pixData.orderId}`)
+        }
+      } catch (err) {
+        console.error('❌ Erro no polling:', err)
+      }
+    }, 3000) // Verifica a cada 3 segundos
+
     // Cleanup ao desmontar
     return () => {
-      console.log('🔌 Desconectando listener Realtime')
+      console.log('🔌 Desconectando Realtime e Polling')
+      clearInterval(pollingInterval)
       supabase.removeChannel(channel)
     }
   }, [pixData?.orderId, formData.email, router])
