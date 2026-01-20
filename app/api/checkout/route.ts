@@ -56,6 +56,7 @@ export async function POST(request: NextRequest) {
       payment_method: body.paymentMethod === 'credit' ? 'credit_card' : body.paymentMethod || 'pix',
       order_bumps: body.orderBumps || [], // camelCase do frontend
       utm_params: body.utm_params || {},
+      discount: body.discount || undefined, // Desconto do cupom
     }
     
     // Se for cartão de crédito, adiciona dados do cartão

@@ -42,6 +42,11 @@ export default function CheckoutPage() {
   const [pixQrCode, setPixQrCode] = useState("")
   const [orderId, setOrderId] = useState("")
   
+  // Cupom system
+  const [cupomInput, setCupomInput] = useState("")
+  const [appliedCupom, setAppliedCupom] = useState<string | null>(null)
+  const [cupomError, setCupomError] = useState("")
+  
   // Form data - Etapa 1
   const [formData, setFormData] = useState({
     name: "",
@@ -85,6 +90,49 @@ export default function CheckoutPage() {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
+  }
+
+  // Cupons disponíveis (hardcoded como installments)
+  const CUPONS: Record<string, { type: 'fixed' | 'percent', value: number }> = {
+    'ADMGM': { type: 'fixed', value: 35 }
+  }
+
+  // Aplicar cupom
+  const applyCupom = () => {
+    const cupomUpper = cupomInput.toUpperCase().trim()
+    
+    if (!cupomUpper) {
+      setCupomError("Digite um cupom")
+      return
+    }
+    
+    if (CUPONS[cupomUpper]) {
+      setAppliedCupom(cupomUpper)
+      setCupomError("")
+      setCupomInput("")
+    } else {
+      setCupomError("Cupom inválido")
+      setAppliedCupom(null)
+    }
+  }
+
+  // Remover cupom
+  const removeCupom = () => {
+    setAppliedCupom(null)
+    setCupomInput("")
+    setCupomError("")
+  }
+
+  // Calcular desconto do cupom
+  const calculateCupomDiscount = (subtotal: number) => {
+    if (!appliedCupom || !CUPONS[appliedCupom]) return 0
+    
+    const cupom = CUPONS[appliedCupom]
+    if (cupom.type === 'fixed') {
+      return Math.min(cupom.value, subtotal) // Não pode ser maior que o subtotal
+    } else {
+      return (subtotal * cupom.value) / 100
+    }
   }
 
   // Order Bumps
@@ -171,7 +219,8 @@ export default function CheckoutPage() {
   const basePrice = 36
   const orderBumpsTotal = selectedOrderBumps.reduce((acc, idx) => acc + orderBumps[idx].price, 0)
   const subtotal = basePrice + orderBumpsTotal
-  const total = subtotal // Sem desconto PIX - desconto via cupom Appmax
+  const cupomDiscount = calculateCupomDiscount(subtotal)
+  const total = subtotal - cupomDiscount // Aplica desconto do cupom
   
   // Calcula parcelas com JUROS SIMPLES - Lógica Appmax
   // Taxa: 2.49% ao mês (0.0249)
@@ -180,6 +229,7 @@ export default function CheckoutPage() {
   // Fórmula: ValorTotalComJuros = ValorOriginal * (1 + (0.0249 * NumeroParcelas))
   // ValorParcela = ValorTotalComJuros / NumeroParcelas
   // Limite: Parcela mínima de R$ 5,00
+  // IMPORTANTE: Cupom é aplicado ANTES do cálculo de parcelas
   const calculateInstallments = () => {
     const TAXA_JUROS = 0.0249 // 2.49% ao mês
     const PARCELA_MINIMA = 5.00
@@ -281,6 +331,7 @@ export default function CheckoutPage() {
         cpf: formData.cpf.replace(/\D/g, ''),
         paymentMethod: paymentMethod,
         orderBumps: selectedBumpProducts,
+        discount: cupomDiscount > 0 ? cupomDiscount : undefined, // Envia desconto se houver
       }
       
       // Se for cartão, adiciona dados do cartão
@@ -390,7 +441,7 @@ export default function CheckoutPage() {
       <div className="h-20 md:h-24"></div>
 
       {/* Main Content */}
-      <div className="container mx-auto max-w-7xl px-3 sm:px-4 py-6 md:py-12">
+      <div className="container mx-auto max-w-7xl px-3 sm:px-4 py-6 md:py-12 pt-8 md:pt-12">
         
         {/* Header */}
         <motion.div
@@ -416,7 +467,7 @@ export default function CheckoutPage() {
           <div className="flex items-center justify-between">
             {[
               { number: 1, label: "Seus Dados", icon: User },
-              { number: 2, label: "Ofertas Extras", icon: Gift },
+              { number: 2, label: "Complementos", icon: Gift },
               { number: 3, label: "Pagamento", icon: CreditCard },
             ].map((step, index) => (
               <div key={step.number} className="flex items-center flex-1">
@@ -571,7 +622,7 @@ export default function CheckoutPage() {
                         <Gift className="w-5 h-5 text-white" />
                       </div>
                       <div>
-                        <h2 className="text-xl md:text-2xl font-black text-gray-900">Ofertas Especiais</h2>
+                        <h2 className="text-xl md:text-2xl font-black text-gray-900">Complementos</h2>
                         <p className="text-xs md:text-sm text-gray-600">Aproveite estas ofertas exclusivas por tempo limitado!</p>
                       </div>
                     </div>
@@ -956,12 +1007,72 @@ export default function CheckoutPage() {
                   </div>
                 )}
 
+                {/* Campo Cupom */}
+                <div className="mb-4 md:mb-6 pb-4 md:pb-6 border-b-2 border-gray-100">
+                  <h4 className="font-bold text-sm md:text-base text-gray-900 mb-3">Cupom de Desconto</h4>
+                  
+                  {appliedCupom ? (
+                    <div className="bg-green-50 border-2 border-green-500 rounded-xl p-3 md:p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 md:w-5 md:h-5 text-green-600" />
+                          <span className="font-bold text-green-900 text-sm md:text-base">{appliedCupom}</span>
+                        </div>
+                        <button
+                          onClick={removeCupom}
+                          className="text-green-700 hover:text-green-900 transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <p className="text-xs md:text-sm text-green-700 font-semibold">
+                        Você economizou R$ {cupomDiscount.toFixed(2)}! 🎉
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={cupomInput}
+                          onChange={(e) => {
+                            setCupomInput(e.target.value.toUpperCase())
+                            setCupomError("")
+                          }}
+                          onKeyPress={(e) => e.key === 'Enter' && applyCupom()}
+                          placeholder="Digite seu cupom"
+                          className="flex-1 px-3 py-2 text-sm border-2 border-gray-200 rounded-lg focus:border-brand-500 focus:outline-none transition-colors"
+                        />
+                        <button
+                          onClick={applyCupom}
+                          className="px-4 py-2 bg-brand-600 text-white text-sm font-bold rounded-lg hover:bg-brand-700 transition-colors whitespace-nowrap"
+                        >
+                          Aplicar
+                        </button>
+                      </div>
+                      {cupomError && (
+                        <p className="text-xs text-red-600 mt-2 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" />
+                          {cupomError}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 {/* Totais */}
                 <div className="space-y-2 md:space-y-3 mb-4 md:mb-6">
                   <div className="flex items-center justify-between text-sm md:text-base text-gray-700">
                     <span>Subtotal</span>
                     <span className="font-bold">R$ {subtotal.toFixed(2)}</span>
                   </div>
+                  
+                  {cupomDiscount > 0 && (
+                    <div className="flex items-center justify-between text-sm md:text-base text-green-600">
+                      <span className="font-semibold">Desconto</span>
+                      <span className="font-bold">- R$ {cupomDiscount.toFixed(2)}</span>
+                    </div>
+                  )}
 
                   <div className="pt-2 md:pt-3 border-t-2 border-gray-100">
                     <div className="flex items-center justify-between text-xl md:text-2xl font-black">

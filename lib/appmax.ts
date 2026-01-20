@@ -74,6 +74,7 @@ export interface AppmaxOrderRequest {
   payment_method: 'credit_card' | 'pix' | 'boleto'
   order_bumps?: AppmaxOrderBump[]
   utm_params?: UTMParams
+  discount?: number // Desconto do cupom em reais
   card_data?: {
     number: string
     holder_name: string
@@ -217,13 +218,22 @@ export async function createAppmaxOrder(data: AppmaxOrderRequest): Promise<Appma
     console.log('📦 Criando pedido com', products.length, 'produtos. Total: R$', cartTotal)
     console.log('📦 Produtos:', JSON.stringify(products, null, 2))
 
+    // Aplica desconto se houver
+    const discount = data.discount || 0
+    const orderTotal = cartTotal - discount
+    
+    if (discount > 0) {
+      console.log(`💰 Desconto aplicado: R$ ${discount}`)
+      console.log(`💰 Total original: R$ ${cartTotal} → Total com desconto: R$ ${orderTotal}`)
+    }
+
     const orderPayload = {
       'access-token': APPMAX_API_TOKEN,
-      total: cartTotal,
+      total: orderTotal, // Total já com desconto aplicado
       products,
       customer_id: customerId,
       shipping: 0,
-      discount: 0,
+      discount: discount, // Envia desconto para Appmax
       freight_type: 'Sedex',
     }
     
