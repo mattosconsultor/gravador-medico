@@ -42,6 +42,45 @@ export default function AnalyticsTracker() {
       const savedUtmMedium = utmMedium || sessionStorage.getItem('utm_medium')
       const savedUtmCampaign = utmCampaign || sessionStorage.getItem('utm_campaign')
 
+      // 🆕 DETECTAR TIPO DE DISPOSITIVO
+      const userAgent = navigator.userAgent.toLowerCase()
+      let deviceType = 'desktop'
+      if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(userAgent)) {
+        deviceType = 'tablet'
+      } else if (/mobile|iphone|ipod|blackberry|opera mini|iemobile|wpdesktop/i.test(userAgent)) {
+        deviceType = 'mobile'
+      }
+
+      // 🆕 DETECTAR BROWSER
+      let browser = 'outros'
+      if (userAgent.includes('chrome') && !userAgent.includes('edg')) {
+        browser = 'chrome'
+      } else if (userAgent.includes('safari') && !userAgent.includes('chrome')) {
+        browser = 'safari'
+      } else if (userAgent.includes('firefox')) {
+        browser = 'firefox'
+      } else if (userAgent.includes('edg')) {
+        browser = 'edge'
+      } else if (userAgent.includes('opera') || userAgent.includes('opr')) {
+        browser = 'opera'
+      }
+
+      // 🆕 CAPTURAR GEOLOCALIZAÇÃO (via API)
+      let geoData = { country: null, city: null, ip: null }
+      try {
+        const geoResponse = await fetch('https://ipapi.co/json/')
+        if (geoResponse.ok) {
+          const geo = await geoResponse.json()
+          geoData = {
+            country: geo.country_name || null,
+            city: geo.city || null,
+            ip: geo.ip || null
+          }
+        }
+      } catch (geoError) {
+        console.warn('Não foi possível obter geolocalização:', geoError)
+      }
+
       // Dados do pageview
       const visitData = {
         page_path: pathname,
@@ -53,6 +92,13 @@ export default function AnalyticsTracker() {
         utm_term: utmTerm,
         user_agent: navigator.userAgent,
         session_id: sessionId,
+        device_type: deviceType,
+        browser: browser,
+        country: geoData.country,
+        city: geoData.city,
+        ip_address: geoData.ip,
+        is_online: true,
+        last_seen: new Date().toISOString()
       }
 
       // Inserir no Supabase (sem autenticação, policy permite insert público)
@@ -61,7 +107,7 @@ export default function AnalyticsTracker() {
       if (error) {
         console.error('Erro ao registrar visita:', error)
       } else {
-        console.log('✅ Visita registrada:', pathname)
+        console.log('✅ Visita registrada:', pathname, '| Dispositivo:', deviceType, '| Browser:', browser)
       }
     } catch (err) {
       console.error('Erro no analytics tracker:', err)

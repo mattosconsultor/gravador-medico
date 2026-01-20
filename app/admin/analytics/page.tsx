@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Card } from '@/components/ui/card'
-import { BarChart3, Users, TrendingUp, Eye, MousePointerClick } from 'lucide-react'
+import { BarChart3, Users, TrendingUp, Eye, MousePointerClick, Radio, Globe, Smartphone } from 'lucide-react'
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { format, subDays, startOfDay, endOfDay } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -17,6 +17,10 @@ interface AnalyticsData {
   topPages: Array<{ page: string; visits: number }>
   trafficSources: Array<{ source: string; count: number }>
   dailyVisits: Array<{ date: string; visits: number; sales: number }>
+  onlineVisitors: number
+  topCountries: Array<{ country: string; count: number }>
+  topCities: Array<{ city: string; count: number }>
+  deviceBreakdown: Array<{ device: string; count: number }>
 }
 
 const COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899']
@@ -137,6 +141,53 @@ export default function AnalyticsPage() {
         sales: data.sales
       }))
 
+      // 7. 🆕 VISITANTES ONLINE (últimos 5 minutos)
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+      const { data: onlineData, error: onlineError } = await supabase
+        .from('analytics_visits')
+        .select('session_id')
+        .gte('last_seen', fiveMinutesAgo)
+        .eq('is_online', true)
+
+      const onlineVisitors = onlineData ? new Set(onlineData.map(v => v.session_id)).size : 0
+
+      // 8. 🆕 TOP PAÍSES
+      const countryCount = (visits || []).reduce((acc, visit) => {
+        if (visit.country) {
+          acc[visit.country] = (acc[visit.country] || 0) + 1
+        }
+        return acc
+      }, {} as Record<string, number>)
+
+      const topCountries = Object.entries(countryCount)
+        .map(([country, count]) => ({ country, count: count as number }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5)
+
+      // 9. 🆕 TOP CIDADES
+      const cityCount = (visits || []).reduce((acc, visit) => {
+        if (visit.city) {
+          acc[visit.city] = (acc[visit.city] || 0) + 1
+        }
+        return acc
+      }, {} as Record<string, number>)
+
+      const topCities = Object.entries(cityCount)
+        .map(([city, count]) => ({ city, count: count as number }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5)
+
+      // 10. 🆕 DISPOSITIVOS
+      const deviceCount = (visits || []).reduce((acc, visit) => {
+        const device = visit.device_type || 'desktop'
+        acc[device] = (acc[device] || 0) + 1
+        return acc
+      }, {} as Record<string, number>)
+
+      const deviceBreakdown = Object.entries(deviceCount)
+        .map(([device, count]) => ({ device, count: count as number }))
+        .sort((a, b) => b.count - a.count)
+
       setData({
         totalVisits: visits?.length || 0,
         uniqueSessions,
@@ -145,7 +196,11 @@ export default function AnalyticsPage() {
         abandonedCarts: abandoned?.length || 0,
         topPages,
         trafficSources,
-        dailyVisits
+        dailyVisits,
+        onlineVisitors,
+        topCountries,
+        topCities,
+        deviceBreakdown
       })
     } catch (error) {
       console.error('Erro ao carregar analytics:', error)
@@ -191,7 +246,20 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Cards de métricas principais */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        {/* 🆕 VISITANTES ONLINE */}
+        <Card className="p-6 bg-gradient-to-br from-green-500 to-emerald-600 text-white">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-white/20 rounded-lg">
+              <Radio className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-sm text-white/80">Online Agora</p>
+              <p className="text-2xl font-bold">{data?.onlineVisitors || 0}</p>
+            </div>
+          </div>
+        </Card>
+
         <Card className="p-6">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-violet-100 rounded-lg">
@@ -293,6 +361,76 @@ export default function AnalyticsPage() {
                 dataKey="count"
               >
                 {data?.trafficSources.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
+        </Card>
+      </div>
+
+      {/* 🆕 NOVOS GRÁFICOS: Geolocalização e Dispositivos */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Top Países */}
+        <Card className="p-6">
+          <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+            <Globe className="w-5 h-5" />
+            Top Países
+          </h2>
+          <div className="space-y-3">
+            {data?.topCountries && data.topCountries.length > 0 ? (
+              data.topCountries.map((item, index) => (
+                <div key={index} className="flex items-center justify-between">
+                  <span className="text-gray-300">{item.country}</span>
+                  <span className="font-bold text-white">{item.count}</span>
+                </div>
+              ))
+            ) : (
+              <p className="text-gray-400 text-sm">Nenhum dado de país disponível</p>
+            )}
+          </div>
+        </Card>
+
+        {/* Top Cidades */}
+        <Card className="p-6">
+          <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+            <Globe className="w-5 h-5" />
+            Top Cidades
+          </h2>
+          <div className="space-y-3">
+            {data?.topCities && data.topCities.length > 0 ? (
+              data.topCities.map((item, index) => (
+                <div key={index} className="flex items-center justify-between">
+                  <span className="text-gray-300">{item.city}</span>
+                  <span className="font-bold text-white">{item.count}</span>
+                </div>
+              ))
+            ) : (
+              <p className="text-gray-400 text-sm">Nenhum dado de cidade disponível</p>
+            )}
+          </div>
+        </Card>
+
+        {/* Dispositivos */}
+        <Card className="p-6">
+          <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+            <Smartphone className="w-5 h-5" />
+            Dispositivos
+          </h2>
+          <ResponsiveContainer width="100%" height={200}>
+            <PieChart>
+              <Pie
+                data={data?.deviceBreakdown || []}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                label={(entry: any) => `${entry.device}: ${entry.count}`}
+                outerRadius={70}
+                fill="#8884d8"
+                dataKey="count"
+              >
+                {data?.deviceBreakdown.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
