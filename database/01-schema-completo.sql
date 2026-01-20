@@ -419,14 +419,13 @@ SELECT
   p.category,
   p.price,
   p.is_active,
-  COUNT(DISTINCT si.sale_id) as total_orders,
-  COALESCE(SUM(si.quantity), 0) as total_quantity_sold,
-  COALESCE(SUM(si.total), 0) as total_revenue,
-  COALESCE(AVG(si.price), 0) as average_price
+  COUNT(DISTINCT CASE WHEN s.status IN ('approved', 'paid', 'completed') THEN si.sale_id END) as total_orders,
+  COALESCE(SUM(CASE WHEN s.status IN ('approved', 'paid', 'completed') THEN si.quantity ELSE 0 END), 0) as total_quantity_sold,
+  COALESCE(SUM(CASE WHEN s.status IN ('approved', 'paid', 'completed') THEN si.total ELSE 0 END), 0) as total_revenue,
+  COALESCE(AVG(CASE WHEN s.status IN ('approved', 'paid', 'completed') THEN si.price END), 0) as average_price
 FROM products p
 LEFT JOIN sales_items si ON p.id = si.product_id
-INNER JOIN sales s ON si.sale_id = s.id
-WHERE s.status IN ('approved', 'paid', 'completed') OR si.sale_id IS NULL
+LEFT JOIN sales s ON si.sale_id = s.id
 GROUP BY p.id, p.sku, p.name, p.category, p.price, p.is_active;
 
 -- View: Funil de vendas CRM
