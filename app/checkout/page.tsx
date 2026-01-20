@@ -175,6 +175,8 @@ export default function CheckoutPage() {
   
   // Calcula parcelas com JUROS SIMPLES - Lógica Appmax
   // Taxa: 2.49% ao mês (0.0249)
+  // 1x: SEM JUROS (valor original)
+  // 2x+: Com juros simples
   // Fórmula: ValorTotalComJuros = ValorOriginal * (1 + (0.0249 * NumeroParcelas))
   // ValorParcela = ValorTotalComJuros / NumeroParcelas
   // Limite: Parcela mínima de R$ 5,00
@@ -186,9 +188,18 @@ export default function CheckoutPage() {
     const parcelas = []
     
     for (let numParcelas = 1; numParcelas <= MAX_PARCELAS; numParcelas++) {
-      // Juros Simples
-      const valorTotalComJuros = total * (1 + (TAXA_JUROS * numParcelas))
-      const valorParcela = valorTotalComJuros / numParcelas
+      let valorTotalComJuros
+      let valorParcela
+      
+      if (numParcelas === 1) {
+        // 1x SEM JUROS - valor original
+        valorTotalComJuros = total
+        valorParcela = total
+      } else {
+        // 2x ou mais - aplica juros simples
+        valorTotalComJuros = total * (1 + (TAXA_JUROS * numParcelas))
+        valorParcela = valorTotalComJuros / numParcelas
+      }
       
       // Se a parcela for menor que R$ 5,00, para de calcular
       if (valorParcela < PARCELA_MINIMA) {
