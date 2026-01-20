@@ -77,6 +77,7 @@ CREATE INDEX IF NOT EXISTS idx_customers_segment ON customers(segment);
 CREATE INDEX IF NOT EXISTS idx_customers_created_at ON customers(created_at);
 
 -- Trigger para updated_at
+DROP TRIGGER IF EXISTS update_customers_updated_at ON customers;
 CREATE TRIGGER update_customers_updated_at
   BEFORE UPDATE ON customers
   FOR EACH ROW
@@ -132,6 +133,7 @@ CREATE INDEX IF NOT EXISTS idx_products_is_active ON products(is_active);
 CREATE INDEX IF NOT EXISTS idx_products_created_at ON products(created_at);
 
 -- Trigger para updated_at
+DROP TRIGGER IF EXISTS update_products_updated_at ON products;
 CREATE TRIGGER update_products_updated_at
   BEFORE UPDATE ON products
   FOR EACH ROW
@@ -242,6 +244,7 @@ CREATE INDEX IF NOT EXISTS idx_sales_created_at ON sales(created_at);
 CREATE INDEX IF NOT EXISTS idx_sales_paid_at ON sales(paid_at);
 
 -- Trigger para updated_at
+DROP TRIGGER IF EXISTS update_sales_updated_at ON sales;
 CREATE TRIGGER update_sales_updated_at
   BEFORE UPDATE ON sales
   FOR EACH ROW
@@ -335,6 +338,7 @@ CREATE INDEX IF NOT EXISTS idx_crm_contacts_source ON crm_contacts(source);
 CREATE INDEX IF NOT EXISTS idx_crm_contacts_next_followup_at ON crm_contacts(next_followup_at);
 
 -- Trigger para updated_at
+DROP TRIGGER IF EXISTS update_crm_contacts_updated_at ON crm_contacts;
 CREATE TRIGGER update_crm_contacts_updated_at
   BEFORE UPDATE ON crm_contacts
   FOR EACH ROW
@@ -378,6 +382,7 @@ CREATE INDEX IF NOT EXISTS idx_crm_activities_status ON crm_activities(status);
 CREATE INDEX IF NOT EXISTS idx_crm_activities_due_date ON crm_activities(due_date);
 
 -- Trigger para updated_at
+DROP TRIGGER IF EXISTS update_crm_activities_updated_at ON crm_activities;
 CREATE TRIGGER update_crm_activities_updated_at
   BEFORE UPDATE ON crm_activities
   FOR EACH ROW
@@ -482,22 +487,40 @@ ALTER TABLE crm_contacts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE crm_activities ENABLE ROW LEVEL SECURITY;
 
 -- Políticas permissivas (ajustar conforme necessidade de auth)
+DROP POLICY IF EXISTS "Permitir leitura de customers" ON customers;
 CREATE POLICY "Permitir leitura de customers" ON customers FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Permitir escrita de customers" ON customers;
 CREATE POLICY "Permitir escrita de customers" ON customers FOR ALL USING (true);
 
+DROP POLICY IF EXISTS "Permitir leitura de products" ON products;
 CREATE POLICY "Permitir leitura de products" ON products FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Permitir escrita de products" ON products;
 CREATE POLICY "Permitir escrita de products" ON products FOR ALL USING (true);
 
+DROP POLICY IF EXISTS "Permitir leitura de sales" ON sales;
 CREATE POLICY "Permitir leitura de sales" ON sales FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Permitir escrita de sales" ON sales;
 CREATE POLICY "Permitir escrita de sales" ON sales FOR ALL USING (true);
 
+DROP POLICY IF EXISTS "Permitir leitura de sales_items" ON sales_items;
 CREATE POLICY "Permitir leitura de sales_items" ON sales_items FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Permitir escrita de sales_items" ON sales_items;
 CREATE POLICY "Permitir escrita de sales_items" ON sales_items FOR ALL USING (true);
 
+DROP POLICY IF EXISTS "Permitir leitura de crm_contacts" ON crm_contacts;
 CREATE POLICY "Permitir leitura de crm_contacts" ON crm_contacts FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Permitir escrita de crm_contacts" ON crm_contacts;
 CREATE POLICY "Permitir escrita de crm_contacts" ON crm_contacts FOR ALL USING (true);
 
+DROP POLICY IF EXISTS "Permitir leitura de crm_activities" ON crm_activities;
 CREATE POLICY "Permitir leitura de crm_activities" ON crm_activities FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Permitir escrita de crm_activities" ON crm_activities;
 CREATE POLICY "Permitir escrita de crm_activities" ON crm_activities FOR ALL USING (true);
 
 -- ========================================
