@@ -148,7 +148,21 @@ product_stats AS (
     GROUP BY 
         p.id, rs.product_name, rs.product_sku
 )
-SELECT * FROM product_stats
+SELECT 
+    product_id,
+    product_name,
+    product_sku,
+    total_sales,
+    total_revenue,
+    total_refunds,
+    refund_amount,
+    refund_rate,
+    average_ticket,
+    conversion_rate,
+    health_score,
+    last_sale_at,
+    first_sale_at
+FROM product_stats
 ORDER BY total_sales DESC;
 
 -- 7. Criar VIEW de tendências (para sparklines)
