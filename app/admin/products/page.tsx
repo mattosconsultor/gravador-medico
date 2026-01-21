@@ -10,6 +10,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { format, subDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { fetchCustomersWithMetrics } from '@/lib/dashboard-queries'
+import { formatMoney } from '@/lib/format'
 
 interface Customer {
   customer_id: string
@@ -340,7 +341,7 @@ export default function CustomersPage() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="font-bold text-green-400">
-                      R$ {customer.total_spent.toFixed(2)}
+                      R$ {formatMoney(customer.total_spent)}
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -351,7 +352,7 @@ export default function CustomersPage() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="text-gray-300">
-                      R$ {customer.average_order_value.toFixed(2)}
+                      R$ {formatMoney(customer.average_order_value)}
                     </div>
                   </td>
                   <td className="px-6 py-4">
