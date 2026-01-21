@@ -68,60 +68,110 @@ CREATE INDEX IF NOT EXISTS idx_sales_items_product_name ON public.sales_items(pr
 CREATE INDEX IF NOT EXISTS idx_products_external_id ON public.products(external_id);
 CREATE INDEX IF NOT EXISTS idx_products_is_active ON public.products(is_active);
 
--- 6. Criar VIEW de performance de produtos
+-- 6. Criar VIEW de performance de produtos (VERSÃO BLINDADA COM JSONB)
 CREATE OR REPLACE VIEW public.product_performance AS
-WITH recent_sales AS (
+WITH raw_items AS (
     SELECT 
-        si.product_name,
-        si.product_sku,
-        si.price,
-        si.quantity,
-        s.status,
+        ca.created_at,
+        ca.status,
+        -- Tratamento de Segurança:
+        -- 1. Garante que pegamos um array válido
+        -- 2. Tenta 'title' (padrão Appmax) ou 'name' (padrão genérico)
+        -- 3. Se tudo falhar, chama de 'Produto Desconhecido'
+        COALESCE(item->>'title', item->>'name', item->>'product_name', 'Produto Desconhecido') as product_name,
+        
+        -- SKU/ID do produto
+        COALESCE(item->>'id', item->>'product_id', item->>'sku', md5(COALESCE(item->>'title', item->>'name', 'unknown'))) as product_sku,
+        
+        -- Tratamento de Preço: Converte para numérico, se falhar vira 0
+        COALESCE(
+            (item->>'unit_price')::numeric, 
+            (item->>'price')::numeric,
+            (item->>'value')::numeric,
+            0
+        ) as price,
+        
+        -- Quantidade
+        COALESCE((item->>'quantity')::integer, 1) as quantity
+    FROM 
+        public.checkout_attempts ca
+        -- O CROSS JOIN LATERAL permite expandir o array linha a linha
+        CROSS JOIN LATERAL jsonb_array_elements(
+            CASE 
+                WHEN jsonb_typeof(ca.cart_items) = 'array' THEN ca.cart_items 
+                ELSE '[]'::jsonb -- Se não for array, usa array vazio para não quebrar
+            END
+        ) as item
+    WHERE 
+        ca.created_at >= CURRENT_DATE - INTERVAL '30 days'
+),
+-- Fallback: Buscar também de sales_items (se existir)
+sales_data AS (
+    SELECT 
         s.created_at,
-        p.id as product_id
+        s.status,
+        si.product_name,
+        COALESCE(si.product_sku, md5(si.product_name)) as product_sku,
+        si.price,
+        si.quantity
     FROM 
         public.sales s
         INNER JOIN public.sales_items si ON si.sale_id = s.id
-        LEFT JOIN public.products p ON (
-            p.external_id = si.product_sku 
-            OR p.name = si.product_name
-        )
     WHERE 
         s.created_at >= CURRENT_DATE - INTERVAL '30 days'
+        AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'sales_items')
+),
+-- Unir ambas as fontes
+all_items AS (
+    SELECT * FROM raw_items
+    UNION ALL
+    SELECT * FROM sales_data
 )
-SELECT
-    MAX(rs.product_id) as product_id,
-    rs.product_name,
-    COALESCE(rs.product_sku, md5(rs.product_name)) as product_sku,
+SELECT 
+    product_name,
+    product_sku,
     
-    -- Métricas de vendas
-    COUNT(CASE WHEN rs.status = 'approved' THEN 1 END) as total_sales,
-    SUM(CASE WHEN rs.status = 'approved' THEN rs.price * rs.quantity ELSE 0 END) as total_revenue,
+    -- Contagens
+    COUNT(*) as total_orders,
+    COUNT(*) FILTER (WHERE status IN ('completed', 'paid', 'approved')) as total_sales,
     
-    -- Métricas de reembolso
-    COUNT(CASE WHEN rs.status IN ('refunded', 'chargeback') THEN 1 END) as total_refunds,
-    SUM(CASE WHEN rs.status IN ('refunded', 'chargeback') THEN rs.price * rs.quantity ELSE 0 END) as refund_amount,
-    
-    -- Taxa de reembolso (%)
-    CASE 
-        WHEN COUNT(*) > 0 THEN 
-            ROUND((COUNT(CASE WHEN rs.status IN ('refunded', 'chargeback') THEN 1 END)::NUMERIC / COUNT(*)::NUMERIC) * 100, 2)
-        ELSE 0
-    END as refund_rate,
+    -- Financeiro
+    COALESCE(SUM(price * quantity) FILTER (WHERE status IN ('completed', 'paid', 'approved')), 0) as total_revenue,
     
     -- Ticket médio
     CASE 
-        WHEN COUNT(CASE WHEN rs.status = 'approved' THEN 1 END) > 0 THEN
-            ROUND(SUM(CASE WHEN rs.status = 'approved' THEN rs.price * rs.quantity ELSE 0 END) / 
-                  COUNT(CASE WHEN rs.status = 'approved' THEN 1 END), 2)
-        ELSE 0
+        WHEN COUNT(*) FILTER (WHERE status IN ('completed', 'paid', 'approved')) > 0 
+        THEN ROUND(
+            SUM(price * quantity) FILTER (WHERE status IN ('completed', 'paid', 'approved')) / 
+            COUNT(*) FILTER (WHERE status IN ('completed', 'paid', 'approved')),
+            2
+        )
+        ELSE 0 
     END as average_ticket,
     
-    -- Taxa de conversão (aprovado / total)
+    -- Reembolsos
+    COUNT(*) FILTER (WHERE status IN ('refunded', 'chargeback')) as total_refunds,
+    COALESCE(SUM(price * quantity) FILTER (WHERE status IN ('refunded', 'chargeback')), 0) as refund_amount,
+    
+    -- Taxa de Reembolso (Evita divisão por zero)
     CASE 
-        WHEN COUNT(*) > 0 THEN 
-            ROUND((COUNT(CASE WHEN rs.status = 'approved' THEN 1 END)::NUMERIC / COUNT(*)::NUMERIC) * 100, 2)
-        ELSE 0
+        WHEN COUNT(*) FILTER (WHERE status IN ('completed', 'paid', 'approved')) > 0 
+        THEN ROUND(
+            (COUNT(*) FILTER (WHERE status IN ('refunded', 'chargeback'))::numeric / 
+             COUNT(*) FILTER (WHERE status IN ('completed', 'paid', 'approved'))::numeric) * 100, 
+            2
+        )
+        ELSE 0 
+    END as refund_rate,
+    
+    -- Taxa de conversão
+    CASE 
+        WHEN COUNT(*) > 0 
+        THEN ROUND(
+            (COUNT(*) FILTER (WHERE status IN ('completed', 'paid', 'approved'))::numeric / COUNT(*)::numeric) * 100,
+            2
+        )
+        ELSE 0 
     END as conversion_rate,
     
     -- Health Score (0-100)
@@ -130,25 +180,37 @@ SELECT
             ROUND(
                 (
                     -- Peso da conversão (40 pontos)
-                    (COUNT(CASE WHEN rs.status = 'approved' THEN 1 END)::NUMERIC / COUNT(*)::NUMERIC) * 40 +
+                    CASE WHEN COUNT(*) > 0 THEN
+                        (COUNT(*) FILTER (WHERE status IN ('completed', 'paid', 'approved'))::numeric / COUNT(*)::numeric) * 40
+                    ELSE 0 END +
                     -- Peso do reembolso invertido (40 pontos)
-                    (1 - (COUNT(CASE WHEN rs.status IN ('refunded', 'chargeback') THEN 1 END)::NUMERIC / GREATEST(COUNT(*), 1)::NUMERIC)) * 40 +
+                    CASE WHEN COUNT(*) FILTER (WHERE status IN ('completed', 'paid', 'approved')) > 0 THEN
+                        (1 - (COUNT(*) FILTER (WHERE status IN ('refunded', 'chargeback'))::numeric / 
+                              GREATEST(COUNT(*) FILTER (WHERE status IN ('completed', 'paid', 'approved')), 1)::numeric)) * 40
+                    ELSE 40 END +
                     -- Peso do volume (20 pontos)
-                    LEAST(COUNT(CASE WHEN rs.status = 'approved' THEN 1 END) / 10.0, 1) * 20
+                    LEAST(COUNT(*) FILTER (WHERE status IN ('completed', 'paid', 'approved')) / 10.0, 1) * 20
                 )
             , 0)
         ELSE 50 -- Score neutro para produtos com poucos dados
     END as health_score,
     
-    MAX(rs.created_at) as last_sale_at,
-    MIN(rs.created_at) as first_sale_at
+    MAX(created_at) as last_sale_at,
+    MIN(created_at) as first_sale_at,
+    
+    -- ID fictício para compatibilidade
+    gen_random_uuid() as product_id
     
 FROM 
-    recent_sales rs
+    all_items
+WHERE 
+    product_name IS NOT NULL 
+    AND product_name != ''
+    AND product_name != 'Produto Desconhecido'
 GROUP BY 
-    rs.product_name, rs.product_sku
+    product_name, product_sku
 ORDER BY 
-    COUNT(CASE WHEN rs.status = 'approved' THEN 1 END) DESC;
+    COUNT(*) FILTER (WHERE status IN ('completed', 'paid', 'approved')) DESC;
 
 -- 7. Criar VIEW de tendências (para sparklines)
 CREATE OR REPLACE VIEW public.product_trends AS
@@ -179,7 +241,7 @@ SELECT
 FROM daily_sales
 GROUP BY product_name;
 
--- 8. Criar função de auto-discovery
+-- 8. Criar função de auto-discovery (VERSÃO BLINDADA COM JSONB)
 CREATE OR REPLACE FUNCTION public.discover_products_from_sales()
 RETURNS TABLE(
     product_name TEXT,
@@ -192,23 +254,63 @@ LANGUAGE plpgsql
 AS $$
 BEGIN
     RETURN QUERY
-    SELECT DISTINCT
-        si.product_name::TEXT,
-        COALESCE(si.product_sku, md5(si.product_name))::TEXT as product_sku,
-        si.price::DECIMAL,
-        COUNT(*)::BIGINT as total_sales,
-        COALESCE(si.product_sku, md5(si.product_name))::TEXT as external_id
-    FROM 
-        public.sales s
-        INNER JOIN public.sales_items si ON si.sale_id = s.id
-    WHERE 
-        s.created_at >= CURRENT_DATE - INTERVAL '90 days'
-        AND si.product_name IS NOT NULL
-        AND si.product_name != ''
-    GROUP BY 
-        si.product_name, si.product_sku, si.price
-    ORDER BY 
-        total_sales DESC
+    WITH raw_items AS (
+        SELECT DISTINCT
+            COALESCE(item->>'title', item->>'name', item->>'product_name', 'Produto Desconhecido')::TEXT as pname,
+            COALESCE(
+                item->>'id', 
+                item->>'product_id', 
+                item->>'sku',
+                md5(COALESCE(item->>'title', item->>'name', 'unknown'))
+            )::TEXT as psku,
+            COALESCE(
+                (item->>'unit_price')::numeric, 
+                (item->>'price')::numeric,
+                (item->>'value')::numeric,
+                0
+            )::DECIMAL as pprice
+        FROM 
+            public.checkout_attempts ca
+            CROSS JOIN LATERAL jsonb_array_elements(
+                CASE 
+                    WHEN jsonb_typeof(ca.cart_items) = 'array' THEN ca.cart_items 
+                    ELSE '[]'::jsonb
+                END
+            ) as item
+        WHERE 
+            ca.created_at >= CURRENT_DATE - INTERVAL '90 days'
+            AND COALESCE(item->>'title', item->>'name', item->>'product_name') IS NOT NULL
+            AND COALESCE(item->>'title', item->>'name', item->>'product_name') != ''
+    ),
+    sales_items AS (
+        SELECT DISTINCT
+            si.product_name::TEXT as pname,
+            COALESCE(si.product_sku, md5(si.product_name))::TEXT as psku,
+            si.price::DECIMAL as pprice
+        FROM 
+            public.sales s
+            INNER JOIN public.sales_items si ON si.sale_id = s.id
+        WHERE 
+            s.created_at >= CURRENT_DATE - INTERVAL '90 days'
+            AND si.product_name IS NOT NULL
+            AND si.product_name != ''
+            AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'sales_items')
+    ),
+    all_products AS (
+        SELECT * FROM raw_items
+        UNION
+        SELECT * FROM sales_items
+    )
+    SELECT 
+        pname,
+        psku,
+        MAX(pprice),
+        COUNT(*)::BIGINT,
+        psku as external_id
+    FROM all_products
+    WHERE pname != 'Produto Desconhecido'
+    GROUP BY pname, psku
+    ORDER BY COUNT(*) DESC
     LIMIT 200;
 END;
 $$;
