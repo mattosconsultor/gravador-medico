@@ -7,7 +7,6 @@
  */
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
 import { Users, Smartphone, Monitor } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -29,23 +28,21 @@ export function RealtimeVisitors() {
     // 🔄 Função que busca o número na View SQL otimizada
     const fetchOnline = async () => {
       try {
-        const { data: result, error } = await supabase
-          .from('analytics_visitors_online')
-          .select('*')
-          .single()
-        
-        if (error) {
-          console.error('❌ Erro ao buscar visitantes online:', error)
+        const response = await fetch('/api/admin/analytics/online', {
+          credentials: 'include'
+        })
+
+        if (!response.ok) {
+          console.error('❌ Erro ao buscar visitantes online')
           return
         }
 
-        if (result) {
-          setData({
-            online_count: result.online_count || 0,
-            mobile_count: result.mobile_count || 0,
-            desktop_count: result.desktop_count || 0
-          })
-        }
+        const result = await response.json()
+        setData({
+          online_count: result.online_count || 0,
+          mobile_count: result.mobile_count || 0,
+          desktop_count: result.desktop_count || 0
+        })
         
         setIsLoading(false)
       } catch (err) {

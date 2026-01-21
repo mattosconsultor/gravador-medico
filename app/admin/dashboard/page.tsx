@@ -1,17 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
 import BigNumbers from '@/components/dashboard/BigNumbers'
 import ConversionFunnel from '@/components/dashboard/ConversionFunnel'
 import OperationalHealth from '@/components/dashboard/OperationalHealth'
 import RealtimeFeed from '@/components/dashboard/RealtimeFeed'
 import { RealtimeVisitors } from '@/components/dashboard/RealtimeVisitors'
-import { 
-  fetchDashboardMetrics, 
-  fetchSalesChartData, 
-  fetchFunnelData 
-} from '@/lib/dashboard-queries'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { RefreshCw, Download } from 'lucide-react'
 
@@ -30,15 +24,18 @@ export default function AdminDashboard() {
     try {
       setRefreshing(true)
       setLoading(true)
-      const [metricsRes, chartRes, funnelRes] = await Promise.all([
-        fetchDashboardMetrics(supabase),
-        fetchSalesChartData(supabase),
-        fetchFunnelData(supabase)
-      ])
-      
-      setMetrics(metricsRes)
-      setChartData(chartRes.data || [])
-      setFunnelData(funnelRes || [])
+      const response = await fetch('/api/admin/dashboard', {
+        credentials: 'include'
+      })
+
+      if (!response.ok) {
+        throw new Error('Falha ao carregar dashboard')
+      }
+
+      const result = await response.json()
+      setMetrics(result.metrics || null)
+      setChartData(result.chartData || [])
+      setFunnelData(result.funnelData || [])
     } catch (err) {
       console.error('Erro no dashboard:', err)
     } finally {

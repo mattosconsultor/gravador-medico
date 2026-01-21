@@ -51,6 +51,7 @@ export default function CustomerDrawer({ customer, open, onClose }: CustomerDraw
       const response = await fetch('/api/admin/customers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email: customer.email }),
       });
       
@@ -73,10 +74,10 @@ export default function CustomerDrawer({ customer, open, onClose }: CustomerDraw
       const response = await fetch('/api/admin/customer-notes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           customer_email: customer.email,
-          note: newNote,
-          created_by_email: 'admin@example.com', // Pegar do auth
+          note: newNote
         }),
       });
       

@@ -30,7 +30,9 @@ export default function RealtimeFeed({
 
     const fetchEvents = async () => {
       try {
-        const response = await fetch('/api/dashboard/realtime-events')
+        const response = await fetch('/api/dashboard/realtime-events', {
+          credentials: 'include'
+        })
         if (response.ok) {
           const data = await response.json()
           setEvents(data.events || [])

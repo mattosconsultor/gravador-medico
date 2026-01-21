@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Webhook, Search, Filter, Calendar, CheckCircle, XCircle, Clock, Eye } from 'lucide-react'
-import { supabaseAdmin } from '@/lib/supabase'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { formatMoney } from '@/lib/format'
@@ -35,19 +34,17 @@ export default function WebhooksPage() {
   const loadWebhooks = async () => {
     try {
       setLoading(true)
+      const response = await fetch('/api/admin/webhooks/logs', {
+        credentials: 'include'
+      })
 
-      const { data, error } = await supabaseAdmin
-        .from('webhooks_logs')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100)
-
-      if (error) {
-        console.error('Erro ao buscar webhooks:', error)
+      if (!response.ok) {
+        console.error('Erro ao buscar webhooks')
         return
       }
 
-      setLogs(data || [])
+      const data = await response.json()
+      setLogs(data.logs || [])
     } catch (error) {
       console.error('Erro ao carregar webhooks:', error)
     } finally {

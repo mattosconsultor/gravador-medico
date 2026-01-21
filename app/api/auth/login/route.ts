@@ -3,7 +3,7 @@ import { authenticateUser, generateToken } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password } = await request.json()
+    const { email, password, rememberMe } = await request.json()
 
     // Validar campos
     if (!email || !password) {
@@ -24,13 +24,23 @@ export async function POST(request: NextRequest) {
     }
 
     // Gerar token
-    const token = await generateToken(email)
+    const token = await generateToken(email, rememberMe ? '30d' : '7d')
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       token,
       message: 'Login realizado com sucesso'
     })
+
+    response.cookies.set('auth_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24 * 7
+    })
+
+    return response
   } catch (error) {
     console.error('Erro no login:', error)
     return NextResponse.json(

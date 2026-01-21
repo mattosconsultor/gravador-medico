@@ -15,16 +15,72 @@ ALTER TABLE public.checkout_attempts
 ADD COLUMN IF NOT EXISTS total_amount NUMERIC DEFAULT 0;
 
 -- Preenche com dados de colunas alternativas que possam existir
-UPDATE public.checkout_attempts
-SET total_amount = COALESCE(
-    -- Tenta pegar de várias colunas possíveis
-    total_amount, -- Se já existe, mantém
-    (checkout_attempts.amount)::numeric, -- Se tem 'amount'
-    (checkout_attempts.value)::numeric, -- Se tem 'value'
-    (checkout_attempts.price)::numeric, -- Se tem 'price'
-    299.90 -- Valor padrão do produto (ajuste se necessário)
-)
-WHERE total_amount IS NULL OR total_amount = 0;
+DO $$
+DECLARE
+    has_amount boolean;
+    has_value boolean;
+    has_price boolean;
+    has_cart_total boolean;
+    has_cart_value boolean;
+    sql text;
+BEGIN
+    SELECT EXISTS(
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'checkout_attempts'
+          AND column_name = 'amount'
+    ) INTO has_amount;
+
+    SELECT EXISTS(
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'checkout_attempts'
+          AND column_name = 'value'
+    ) INTO has_value;
+
+    SELECT EXISTS(
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'checkout_attempts'
+          AND column_name = 'price'
+    ) INTO has_price;
+
+    SELECT EXISTS(
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'checkout_attempts'
+          AND column_name = 'cart_total'
+    ) INTO has_cart_total;
+
+    SELECT EXISTS(
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'checkout_attempts'
+          AND column_name = 'cart_value'
+    ) INTO has_cart_value;
+
+    sql := 'UPDATE public.checkout_attempts SET total_amount = COALESCE(total_amount';
+
+    IF has_amount THEN
+        sql := sql || ', (checkout_attempts.amount)::numeric';
+    END IF;
+    IF has_value THEN
+        sql := sql || ', (checkout_attempts.value)::numeric';
+    END IF;
+    IF has_price THEN
+        sql := sql || ', (checkout_attempts.price)::numeric';
+    END IF;
+    IF has_cart_total THEN
+        sql := sql || ', (checkout_attempts.cart_total)::numeric';
+    END IF;
+    IF has_cart_value THEN
+        sql := sql || ', (checkout_attempts.cart_value)::numeric';
+    END IF;
+
+    sql := sql || ', 299.90) WHERE total_amount IS NULL OR total_amount = 0';
+
+    EXECUTE sql;
+END $$;
 
 -- ==========================================
 -- 2️⃣ RECRIAR VIEWS (Agora total_amount existe)

@@ -2,19 +2,23 @@ import { getUserByEmail } from './supabase'
 import { SignJWT, jwtVerify } from 'jose'
 import bcrypt from 'bcryptjs'
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'your-secret-key-change-in-production'
-)
+function getJwtSecretKey(): Uint8Array {
+  const secret = process.env.JWT_SECRET
+  if (!secret) {
+    throw new Error('JWT_SECRET não configurado')
+  }
+  return new TextEncoder().encode(secret)
+}
 
 /**
  * Gera um token JWT para o usuário
  */
-export async function generateToken(email: string): Promise<string> {
+export async function generateToken(email: string, expiresIn: string = '7d'): Promise<string> {
   const token = await new SignJWT({ email })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime('7d') // Token válido por 7 dias
-    .sign(JWT_SECRET)
+    .setExpirationTime(expiresIn)
+    .sign(getJwtSecretKey())
 
   return token
 }
@@ -24,7 +28,7 @@ export async function generateToken(email: string): Promise<string> {
  */
 export async function verifyToken(token: string): Promise<{ email: string } | null> {
   try {
-    const { payload } = await jwtVerify(token, JWT_SECRET)
+    const { payload } = await jwtVerify(token, getJwtSecretKey())
     return payload as { email: string }
   } catch (error) {
     console.error('Erro ao verificar token:', error)

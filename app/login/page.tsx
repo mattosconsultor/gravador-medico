@@ -29,7 +29,7 @@ function LoginForm() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, rememberMe }),
       })
 
       console.log('📡 Resposta da API:', response.status)
@@ -41,18 +41,9 @@ function LoginForm() {
         throw new Error(data.error || 'Email ou senha incorretos')
       }
 
-      // Salvar token no localStorage
-      console.log('💾 Salvando token no localStorage...')
-      localStorage.setItem('auth_token', data.token)
-      
-      // Se "Lembrar-me" estiver marcado, salvar por mais tempo
-      if (rememberMe) {
-        console.log('✅ Opção "Lembrar-me" ativada - sessão estendida')
-        localStorage.setItem('auth_remember', 'true')
-      } else {
-        localStorage.removeItem('auth_remember')
-      }
-      console.log('✅ Token salvo!')
+      // Limpar tokens antigos no localStorage (migração para cookie HttpOnly)
+      localStorage.removeItem('auth_token')
+      localStorage.removeItem('auth_remember')
 
       // Redirecionar
       const redirect = searchParams.get('redirect') || '/admin/dashboard'

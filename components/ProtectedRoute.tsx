@@ -16,32 +16,20 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        // Pegar token do localStorage
-        const token = localStorage.getItem("auth_token")
-
-        if (!token) {
-          router.push("/login")
-          return
-        }
-
-        // Verificar token com a API
+        // Verificar sessão via cookie HttpOnly
         const response = await fetch("/api/auth/me", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          credentials: "include",
         })
 
         if (!response.ok) {
-          // Token inválido, redirecionar para login
-          localStorage.removeItem("auth_token")
           router.push("/login")
           return
         }
 
-        const user = await response.json()
+        const data = await response.json()
 
         // Verificar se tem acesso
-        if (!user.has_access) {
+        if (!data.user?.has_access) {
           router.push("/login")
           return
         }

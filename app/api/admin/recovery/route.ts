@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { requireAdmin } from '@/lib/auth-server'
 
 export async function GET(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.user) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status || 401 })
+  }
+
   try {
     // Buscar todos os checkouts attempts
     const { data: attempts, error } = await supabaseAdmin
@@ -28,7 +34,7 @@ export async function GET(request: NextRequest) {
 
     if (attempts && attempts.length > 0) {
       attempts.forEach((attempt) => {
-        const amount = parseFloat(attempt.total_amount || '0')
+        const amount = parseFloat((attempt.total_amount ?? attempt.cart_total ?? '0') as string)
         
         // Receita recuperada (status = recovered)
         if (attempt.recovery_status === 'recovered') {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAppmaxOrder } from '@/lib/appmax'
+import { supabaseAdmin } from '@/lib/supabase'
 
 /**
  * API de Checkout - Integração Completa com Appmax
@@ -15,6 +16,10 @@ import { createAppmaxOrder } from '@/lib/appmax'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
+    const sessionId = body.session_id || body.sessionId || null
+    const utmParams = body.utm_params || {}
+    const userAgent = request.headers.get('user-agent') || null
+    const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null
     
     console.log('🛒 Iniciando checkout API...')
     console.log('📦 Dados recebidos:', {
@@ -55,7 +60,7 @@ export async function POST(request: NextRequest) {
       quantity: 1,
       payment_method: body.paymentMethod === 'credit' ? 'credit_card' : body.paymentMethod || 'pix',
       order_bumps: body.orderBumps || [], // camelCase do frontend
-      utm_params: body.utm_params || {},
+      utm_params: utmParams,
       discount: body.discount || 0,
     }
     
@@ -163,6 +168,82 @@ export async function POST(request: NextRequest) {
         },
         { status: 500 }
       )
+    }
+
+    // Registrar tentativa de checkout (para analytics e recovery)
+    try {
+      const cartItems = [
+        {
+          product_id: orderData.product_id,
+          name: 'Gravador Médico - Acesso Vitalício',
+          price: MAIN_PRODUCT_PRICE,
+          quantity: 1,
+          type: 'main'
+        },
+        ...(orderData.order_bumps || []).map((bump: any) => ({
+          product_id: bump.product_id,
+          name: `Order Bump ${bump.product_id}`,
+          price: ([
+            { id: '32989468', price: 29.90 },
+            { id: '32989503', price: 97 },
+            { id: '32989520', price: 39.90 }
+          ].find((item) => item.id === bump.product_id)?.price || 0),
+          quantity: bump.quantity || 1,
+          type: 'bump'
+        }))
+      ]
+
+      const attemptPayload: Record<string, any> = {
+        session_id: sessionId || `session_${Date.now()}`,
+        customer_email: body.email,
+        customer_name: body.name,
+        customer_phone: body.phone,
+        customer_cpf: cpf,
+        cart_items: cartItems,
+        cart_total: finalTotal,
+        total_amount: finalTotal,
+        appmax_order_id: result.order_id,
+        payment_method: orderData.payment_method,
+        status: result.status || 'pending',
+        pix_code: result.pix_emv || null,
+        pix_qr_code: result.pix_qr_code || null,
+        utm_source: utmParams.utm_source || null,
+        utm_medium: utmParams.utm_medium || null,
+        utm_campaign: utmParams.utm_campaign || null,
+        ip_address: ipAddress,
+        user_agent: userAgent,
+        recovery_status: 'pending',
+        metadata: {
+          appmax_order_id: result.order_id,
+          discount: orderData.discount || 0,
+          order_bumps: orderData.order_bumps || []
+        }
+      }
+
+      const { error: attemptError } = await supabaseAdmin
+        .from('checkout_attempts')
+        .insert(attemptPayload)
+
+      if (attemptError) {
+        // Fallback para schemas antigos sem colunas novas
+        if (attemptError.message?.includes('appmax_order_id') || attemptError.message?.includes('total_amount')) {
+          const legacyPayload = { ...attemptPayload }
+          delete legacyPayload.appmax_order_id
+          delete legacyPayload.total_amount
+
+          const { error: legacyError } = await supabaseAdmin
+            .from('checkout_attempts')
+            .insert(legacyPayload)
+
+          if (legacyError) {
+            console.warn('⚠️ Falha ao registrar checkout_attempts (legacy):', legacyError)
+          }
+        } else {
+          console.warn('⚠️ Falha ao registrar checkout_attempts:', attemptError)
+        }
+      }
+    } catch (logError) {
+      console.warn('⚠️ Falha ao registrar checkout_attempts:', logError)
     }
 
     // Retorna dados do pedido (incluindo redirect_url para PIX)

@@ -507,6 +507,19 @@ export default function CheckoutPage() {
       }))
       
       // Prepara payload base
+      const sessionId =
+        (typeof window !== 'undefined' && localStorage.getItem('analytics_session_id')) ||
+        (typeof window !== 'undefined' && sessionStorage.getItem('session_id')) ||
+        `session_${Date.now()}`
+
+      const utmParams = {
+        utm_source: typeof window !== 'undefined' ? sessionStorage.getItem('utm_source') || undefined : undefined,
+        utm_medium: typeof window !== 'undefined' ? sessionStorage.getItem('utm_medium') || undefined : undefined,
+        utm_campaign: typeof window !== 'undefined' ? sessionStorage.getItem('utm_campaign') || undefined : undefined,
+        utm_content: typeof window !== 'undefined' ? sessionStorage.getItem('utm_content') || undefined : undefined,
+        utm_term: typeof window !== 'undefined' ? sessionStorage.getItem('utm_term') || undefined : undefined,
+      }
+
       const payload: any = {
         name: formData.name,
         email: formData.email,
@@ -515,6 +528,8 @@ export default function CheckoutPage() {
         paymentMethod: paymentMethod,
         orderBumps: selectedBumpProducts,
         discount: cupomDiscount > 0 ? cupomDiscount : undefined, // Envia desconto se houver
+        session_id: sessionId,
+        utm_params: utmParams,
       }
       
       // Se for cartão, adiciona dados do cartão

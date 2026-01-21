@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { requireAdmin } from '@/lib/auth-server';
 
 export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.user) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status || 401 })
+  }
+
   try {
     const body = await request.json();
-    const { customer_email, note, created_by_email, is_important = false } = body;
+    const { customer_email, note, is_important = false } = body;
     
     if (!customer_email || !note) {
       return NextResponse.json(
@@ -20,7 +26,7 @@ export async function POST(request: NextRequest) {
       .insert({
         customer_email,
         note,
-        created_by_email: created_by_email || 'admin@system',
+        created_by_email: auth.user.email || 'admin@system',
         is_important,
       })
       .select()

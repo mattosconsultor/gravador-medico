@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { requireAdmin } from '@/lib/auth-server'
 
 // Tipagem do item que vem da Appmax dentro do JSONB
 interface AppmaxItem {
@@ -40,7 +41,12 @@ interface Product {
  * 
  * Evita cadastro manual e garante que todos os produtos vendidos estejam catalogados.
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.user) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status || 401 })
+  }
+
   try {
     const supabase = supabaseAdmin
 
@@ -85,7 +91,12 @@ export async function POST(request: Request) {
 /**
  * GET: Buscar produtos com métricas de performance
  */
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.user) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status || 401 })
+  }
+
   try {
     const supabase = supabaseAdmin
     const { searchParams } = new URL(request.url)

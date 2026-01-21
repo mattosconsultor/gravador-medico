@@ -30,7 +30,9 @@ export default function CustomersPage() {
     setLoading(true)
     try {
       const params = new URLSearchParams({ search, limit: '50' })
-      const res = await fetch(`/api/admin/customers?${params}`)
+      const res = await fetch(`/api/admin/customers?${params}`, {
+        credentials: 'include'
+      })
       const data = await res.json()
       setCustomers(data.customers || [])
       setStats(data.stats || stats)

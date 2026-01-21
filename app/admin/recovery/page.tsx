@@ -59,7 +59,9 @@ export default function RecoveryPage() {
     else setLoading(true)
 
     try {
-      const response = await fetch('/api/admin/recovery')
+      const response = await fetch('/api/admin/recovery', {
+        credentials: 'include'
+      })
       const result = await response.json()
 
       if (result.success) {

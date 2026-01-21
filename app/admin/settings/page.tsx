@@ -16,7 +16,6 @@ import {
   Copy,
   RefreshCw,
 } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
 
 export default function SettingsPage() {
   const [showAppmaxToken, setShowAppmaxToken] = useState(false)
@@ -24,12 +23,40 @@ export default function SettingsPage() {
   const [showSupabaseKey, setShowSupabaseKey] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle')
   const [webhookUrl, setWebhookUrl] = useState('')
+  const [configStatus, setConfigStatus] = useState({
+    appmaxTokenConfigured: false,
+    appmaxWebhookSecretConfigured: false,
+    supabaseServiceRoleConfigured: false,
+    appmaxApiUrl: 'https://admin.appmax.com.br/api/v3'
+  })
 
   useEffect(() => {
     // URL do webhook para configurar na Appmax
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
     setWebhookUrl(`${baseUrl}/api/webhook/appmax`)
+
+    loadConfigStatus()
   }, [])
+
+  const loadConfigStatus = async () => {
+    try {
+      const response = await fetch('/api/admin/config', {
+        credentials: 'include'
+      })
+
+      if (!response.ok) return
+
+      const data = await response.json()
+      setConfigStatus({
+        appmaxTokenConfigured: Boolean(data.appmaxTokenConfigured),
+        appmaxWebhookSecretConfigured: Boolean(data.appmaxWebhookSecretConfigured),
+        supabaseServiceRoleConfigured: Boolean(data.supabaseServiceRoleConfigured),
+        appmaxApiUrl: data.appmaxApiUrl || 'https://admin.appmax.com.br/api/v3'
+      })
+    } catch (error) {
+      console.error('Erro ao carregar configurações:', error)
+    }
+  }
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
@@ -40,23 +67,9 @@ export default function SettingsPage() {
     try {
       setSaveStatus('saving')
       
-      const response = await fetch('/api/webhook/appmax', {
+      const response = await fetch('/api/admin/webhooks/test', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          event: 'test',
-          data: {
-            order_id: 'TEST-' + Date.now(),
-            status: 'approved',
-            amount: 100.00,
-            customer: {
-              name: 'Teste Webhook',
-              email: 'teste@gravadormedico.com',
-            },
-          },
-        }),
+        credentials: 'include'
       })
 
       if (response.ok) {
@@ -172,7 +185,7 @@ export default function SettingsPage() {
             <div className="flex gap-2">
               <input
                 type={showAppmaxToken ? 'text' : 'password'}
-                value={process.env.NEXT_PUBLIC_APPMAX_API_TOKEN || 'Não configurado'}
+                value={configStatus.appmaxTokenConfigured ? '**************' : 'Não configurado'}
                 readOnly
                 className="flex-1 px-4 py-3 bg-gray-900 border border-gray-700 rounded-xl text-white font-mono text-sm focus:outline-none"
               />
@@ -184,7 +197,7 @@ export default function SettingsPage() {
               </button>
             </div>
             <p className="text-xs text-gray-500 mt-2">
-              Configure a variável <code className="bg-gray-900 px-2 py-1 rounded">NEXT_PUBLIC_APPMAX_API_TOKEN</code> no arquivo .env.local
+              Configure a variável <code className="bg-gray-900 px-2 py-1 rounded">APPMAX_API_TOKEN</code> no servidor (não use variáveis NEXT_PUBLIC).
             </p>
           </div>
 
@@ -192,7 +205,7 @@ export default function SettingsPage() {
             <label className="block text-sm font-semibold text-gray-400 mb-2">URL da API</label>
             <input
               type="text"
-              value="https://api.appmax.com.br/v3"
+              value={configStatus.appmaxApiUrl}
               readOnly
               className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-xl text-white font-mono text-sm focus:outline-none"
             />

@@ -1,19 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserFromToken } from '@/lib/auth'
+import { getAuthTokenFromRequest } from '@/lib/auth-server'
 
 export async function GET(request: NextRequest) {
   try {
-    // Pegar token do header Authorization
-    const authHeader = request.headers.get('authorization')
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const token = getAuthTokenFromRequest(request)
+
+    if (!token) {
       return NextResponse.json(
         { error: 'Token não fornecido' },
         { status: 401 }
       )
     }
-
-    const token = authHeader.substring(7) // Remove "Bearer "
 
     // Verificar token e buscar usuário
     const user = await getUserFromToken(token)

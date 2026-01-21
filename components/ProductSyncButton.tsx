@@ -19,8 +19,9 @@ export function ProductSyncButton({ onSyncComplete }: ProductSyncButtonProps) {
     setStatus('idle')
 
     try {
-      const res = await fetch('/api/admin/products/sync', { 
-        method: 'POST' 
+      const res = await fetch('/api/admin/products/sync', {
+        method: 'POST',
+        credentials: 'include'
       })
       
       const data = await res.json()

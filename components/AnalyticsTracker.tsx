@@ -158,6 +158,8 @@ export default function AnalyticsTracker({ city, country, region }: AnalyticsPro
       if (utmSource) sessionStorage.setItem('utm_source', utmSource)
       if (utmMedium) sessionStorage.setItem('utm_medium', utmMedium)
       if (utmCampaign) sessionStorage.setItem('utm_campaign', utmCampaign)
+      if (utmContent) sessionStorage.setItem('utm_content', utmContent)
+      if (utmTerm) sessionStorage.setItem('utm_term', utmTerm)
 
       // Recuperar UTMs salvos (caso página atual não tenha UTM na URL)
       const savedUtmSource = utmSource || sessionStorage.getItem('utm_source')

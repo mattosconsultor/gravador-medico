@@ -105,7 +105,7 @@ export interface AppmaxOrderResponse {
 export async function createAppmaxOrder(data: AppmaxOrderRequest): Promise<AppmaxOrderResponse> {
   try {
     // Debug: Verifica se token está presente
-    console.log('🔑 Token presente:', APPMAX_API_TOKEN ? 'SIM (primeiros 8 chars: ' + APPMAX_API_TOKEN.substring(0, 8) + '...)' : 'NÃO')
+    console.log('🔑 Token presente:', APPMAX_API_TOKEN ? 'SIM' : 'NÃO')
     
     if (!APPMAX_API_TOKEN) {
       throw new Error('Token da API Appmax não configurado. Verifique APPMAX_API_TOKEN nas variáveis de ambiente.')
@@ -242,7 +242,10 @@ export async function createAppmaxOrder(data: AppmaxOrderRequest): Promise<Appma
       freight_type: 'Sedex',
     }
     
-    console.log('📤 Payload do pedido:', JSON.stringify(orderPayload, null, 2))
+    console.log('📤 Payload do pedido:', JSON.stringify({
+      ...orderPayload,
+      'access-token': '***'
+    }, null, 2))
 
     const orderResponse = await fetch(`${APPMAX_API_URL}/order`, {
       method: 'POST',

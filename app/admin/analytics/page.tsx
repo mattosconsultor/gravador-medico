@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
 import { Card } from '@/components/ui/card'
 import { BarChart3, Users, TrendingUp, Target, DollarSign, Clock, Eye, Zap, MousePointer } from 'lucide-react'
 import { BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
@@ -57,29 +56,19 @@ export default function AnalyticsPage() {
 
   async function loadAnalytics() {
     try {
-      // Health Metrics
-      const { data: healthData } = await supabase
-        .from('analytics_health')
-        .select('*')
-        .single()
-      
-      if (healthData) setHealth(healthData)
+      const response = await fetch('/api/admin/analytics', {
+        credentials: 'include'
+      })
 
-      // Marketing Attribution
-      const { data: attrData } = await supabase
-        .from('marketing_attribution')
-        .select('*')
-        .limit(10)
-      
-      if (attrData) setAttribution(attrData)
+      if (!response.ok) {
+        throw new Error('Falha ao carregar analytics')
+      }
 
-      // Funnel
-      const { data: funnelData } = await supabase
-        .from('analytics_funnel')
-        .select('*')
-        .single()
-      
-      if (funnelData) setFunnel(funnelData)
+      const result = await response.json()
+
+      if (result.health) setHealth(result.health)
+      if (result.attribution) setAttribution(result.attribution)
+      if (result.funnel) setFunnel(result.funnel)
 
       setLoading(false)
     } catch (error) {
@@ -89,12 +78,18 @@ export default function AnalyticsPage() {
   }
 
   async function loadOnlineVisitors() {
-    const { data } = await supabase
-      .from('analytics_visitors_online')
-      .select('online_count')
-      .single()
-    
-    if (data) setOnlineVisitors(data.online_count || 0)
+    try {
+      const response = await fetch('/api/admin/analytics/online', {
+        credentials: 'include'
+      })
+
+      if (!response.ok) return
+
+      const data = await response.json()
+      setOnlineVisitors(data.online_count || 0)
+    } catch (error) {
+      console.error('Erro ao buscar visitantes online:', error)
+    }
   }
 
   if (loading || !health) {

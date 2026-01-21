@@ -21,7 +21,6 @@ import {
   CheckCircle2,
   Clock
 } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -71,33 +70,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const loadNotifications = async () => {
     try {
-      // Carrinhos abandonados
-      const { count: abandonedCount } = await supabase
-        .from('abandoned_carts')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'abandoned')
-      
-      // Pedidos pendentes (últimas 24h)
-      const yesterday = new Date()
-      yesterday.setDate(yesterday.getDate() - 1)
-      
-      const { count: pendingCount } = await supabase
-        .from('sales')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending')
-        .gte('created_at', yesterday.toISOString())
-      
-      // Pedidos aprovados (últimas 24h)
-      const { count: approvedCount } = await supabase
-        .from('sales')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'approved')
-        .gte('created_at', yesterday.toISOString())
-      
+      const response = await fetch('/api/admin/notifications', {
+        credentials: 'include'
+      })
+
+      if (!response.ok) {
+        return
+      }
+
+      const data = await response.json()
       setNotifications({
-        abandonedCarts: abandonedCount || 0,
-        pendingOrders: pendingCount || 0,
-        approvedOrders: approvedCount || 0,
+        abandonedCarts: data.abandonedCarts || 0,
+        pendingOrders: data.pendingOrders || 0,
+        approvedOrders: data.approvedOrders || 0
       })
     } catch (error) {
       console.error('Erro ao buscar notificações:', error)
@@ -106,23 +91,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const checkAuth = async () => {
     try {
-      // Buscar token do localStorage
-      const token = localStorage.getItem('auth_token')
-      
-      if (!token) {
-        router.push('/login?redirect=/admin/dashboard')
-        return
-      }
-
-      // Verificar token com a API
+      // Verificar sessão via cookie HttpOnly
       const response = await fetch('/api/auth/me', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        credentials: 'include'
       })
 
       if (!response.ok) {
-        localStorage.removeItem('auth_token')
         router.push('/login?redirect=/admin/dashboard')
         return
       }
@@ -142,13 +116,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       setLoading(false)
     } catch (error) {
       console.error('Erro ao verificar auth:', error)
-      localStorage.removeItem('auth_token')
       router.push('/login')
     }
   }
 
   const handleLogout = async () => {
-    localStorage.removeItem('auth_token')
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
     router.push('/')
   }
 

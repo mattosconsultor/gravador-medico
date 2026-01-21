@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS checkout_attempts (
   
   -- Identificadores
   session_id TEXT NOT NULL, -- ID da sessão do usuário
+  appmax_order_id TEXT, -- ID do pedido na Appmax (quando gerado)
   
   -- Dados do cliente (capturados no checkout)
   customer_email TEXT NOT NULL,
@@ -30,6 +31,7 @@ CREATE TABLE IF NOT EXISTS checkout_attempts (
   -- Carrinho
   cart_items JSONB NOT NULL DEFAULT '[]'::jsonb, -- Array de produtos
   cart_total NUMERIC(10,2) NOT NULL,
+  total_amount NUMERIC(10,2) DEFAULT 0, -- Valor final pago (compatibilidade com analytics)
   
   -- Método de pagamento selecionado
   payment_method TEXT, -- pix, credit_card, boleto

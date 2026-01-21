@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { NextRequest, NextResponse } from 'next/server'
+import { supabaseAdmin } from '@/lib/supabase'
+import { requireAdmin } from '@/lib/auth-server'
 
 interface RealtimeEvent {
   id: string
@@ -9,11 +10,16 @@ interface RealtimeEvent {
   timestamp: string
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.user) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status || 401 })
+  }
+
   try {
 
     // Buscar últimas vendas (últimas 10)
-    const { data: sales } = await supabase
+    const { data: sales } = await supabaseAdmin
       .from('sales')
       .select('id, customer_name, total_amount, created_at, status')
       .in('status', ['paid', 'approved'])
@@ -21,7 +27,7 @@ export async function GET() {
       .limit(10)
 
     // Buscar carrinhos abandonados recentes (últimas 5)
-    const { data: carts } = await supabase
+    const { data: carts } = await supabaseAdmin
       .from('abandoned_carts')
       .select('id, customer_name, customer_email, cart_value, created_at')
       .eq('status', 'abandoned')
@@ -30,7 +36,7 @@ export async function GET() {
       .limit(5)
 
     // Buscar pagamentos falhados recentes (últimas 5)
-    const { data: failed } = await supabase
+    const { data: failed } = await supabaseAdmin
       .from('sales')
       .select('id, customer_name, total_amount, created_at, status')
       .in('status', ['canceled', 'cancelado', 'refused', 'failed', 'denied'])

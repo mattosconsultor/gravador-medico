@@ -112,7 +112,8 @@ export async function createOrUpdateUser(data: {
  * Busca usuário por email
  */
 export async function getUserByEmail(email: string) {
-  const { data, error } = await supabase
+  const client = supabaseServiceRoleKey ? supabaseAdmin : supabase
+  const { data, error } = await client
     .from('users')
     .select('*')
     .eq('email', email)

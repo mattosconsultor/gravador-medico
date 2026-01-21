@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { requireAdmin } from '@/lib/auth-server';
 
 export const runtime = 'nodejs';
 export const revalidate = 30; // Cache de 30s
@@ -23,6 +24,11 @@ export interface Customer {
 }
 
 export async function GET(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.user) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status || 401 })
+  }
+
   try {
     const supabase = supabaseAdmin;
     const { searchParams } = new URL(request.url);
@@ -98,6 +104,11 @@ export async function GET(request: NextRequest) {
 
 // GET /api/admin/customers/[email] - Detalhes de um cliente específico
 export async function POST(request: NextRequest) {
+  const auth = await requireAdmin(request)
+  if (!auth.user) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status || 401 })
+  }
+
   try {
     const supabase = supabaseAdmin;
     const body = await request.json();

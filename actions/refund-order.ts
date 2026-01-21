@@ -2,12 +2,14 @@
 
 import { supabase } from '@/lib/supabase'
 import { createClient } from '@supabase/supabase-js'
+import { cookies } from 'next/headers'
+import { getUserFromToken } from '@/lib/auth'
 
 /**
  * 🔒 SERVER ACTION: Estornar Pedido via AppMax
  * 
  * SEGURANÇA:
- * - Só executa no servidor (never expõe APPMAX_API_KEY)
+ * - Só executa no servidor (never expõe APPMAX_API_TOKEN)
  * - Valida se usuário é admin
  * - Registra em audit_logs
  */
@@ -24,15 +26,17 @@ export async function refundOrder(
   reason: string = 'Solicitado pelo cliente'
 ): Promise<RefundResult> {
   try {
-    // 1️⃣ VALIDAR ADMIN (TODO: implementar auth real)
-    // const { data: { user } } = await supabase.auth.getUser()
-    // if (!user || user.user_metadata?.role !== 'admin') {
-    //   return {
-    //     success: false,
-    //     message: 'Não autorizado',
-    //     error: 'UNAUTHORIZED'
-    //   }
-    // }
+    // 1️⃣ VALIDAR ADMIN via cookie HttpOnly
+    const token = cookies().get('auth_token')?.value
+    const user = token ? await getUserFromToken(token) : null
+
+    if (!user || user.role !== 'admin') {
+      return {
+        success: false,
+        message: 'Não autorizado',
+        error: 'UNAUTHORIZED'
+      }
+    }
 
     // 2️⃣ BUSCAR VENDA NO BANCO
     const { data: sale, error: fetchError } = await supabase
@@ -59,11 +63,11 @@ export async function refundOrder(
     }
 
     // 3️⃣ CHAMAR API DA APPMAX
-    const appmaxApiKey = process.env.APPMAX_API_KEY
+    const appmaxApiKey = process.env.APPMAX_API_TOKEN
     const appmaxApiUrl = process.env.APPMAX_API_URL || 'https://admin.appmax.com.br/api/v3'
 
     if (!appmaxApiKey) {
-      console.error('❌ APPMAX_API_KEY não configurada')
+      console.error('❌ APPMAX_API_TOKEN não configurada')
       return {
         success: false,
         message: 'Configuração de API ausente',
