@@ -18,6 +18,7 @@ import {
 import { supabaseAdmin } from '@/lib/supabase'
 import { format, subDays, startOfDay, endOfDay } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { formatMoney } from '@/lib/format'
 
 interface Sale {
   id: string
@@ -564,9 +565,9 @@ export default function SalesPage() {
                 <div className="space-y-2">
                   <p className="text-white"><strong>Método:</strong> {selectedSale.payment_method?.toUpperCase()}</p>
                   <p className="text-white flex items-center gap-2"><strong>Status:</strong> <StatusBadge status={selectedSale.status} /></p>
-                  <p className="text-white"><strong>Valor:</strong> R$ {selectedSale.total_amount?.toFixed(2)}</p>
+                  <p className="text-white"><strong>Valor:</strong> R$ {formatMoney(selectedSale.total_amount)}</p>
                   {selectedSale.discount_amount && selectedSale.discount_amount > 0 && (
-                    <p className="text-white"><strong>Desconto:</strong> R$ {selectedSale.discount_amount?.toFixed(2)}</p>
+                    <p className="text-white"><strong>Desconto:</strong> R$ {formatMoney(selectedSale.discount_amount)}</p>
                   )}
                 </div>
               </div>

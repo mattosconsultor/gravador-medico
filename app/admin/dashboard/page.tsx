@@ -20,6 +20,7 @@ import {
 import { supabaseAdmin } from '@/lib/supabase'
 import { format, subDays, startOfDay, endOfDay } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { formatMoney, formatPercent } from '@/lib/format'
 import {
   AreaChart,
   Area,
@@ -268,7 +269,7 @@ export default function AdminDashboard() {
           change >= 0 ? 'text-green-400' : 'text-red-400'
         }`}>
           {change >= 0 ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
-          {Math.abs(change).toFixed(1)}%
+          {formatPercent(Math.abs(change))}%
         </div>
       </div>
       <h3 className="text-gray-400 text-sm font-semibold mb-1">{title}</h3>
@@ -453,7 +454,7 @@ export default function AdminDashboard() {
                   boxShadow: '0 4px 6px -1px rgba(0,0,0,0.3)',
                   color: '#fff'
                 }}
-                formatter={(value: any) => `R$ ${Number(value).toFixed(2)}`}
+                formatter={(value: any) => `R$ ${formatMoney(value)}`}
               />
               <Area 
                 type="monotone" 
@@ -543,7 +544,7 @@ export default function AdminDashboard() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="font-bold text-green-400">
-                      R$ {Number(sale.total_amount).toFixed(2)}
+                      R$ {formatMoney(sale.total_amount)}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">

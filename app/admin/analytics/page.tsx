@@ -7,6 +7,7 @@ import { BarChart3, Users, TrendingUp, Eye, MousePointerClick, Radio, Globe, Sma
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { format, subDays, startOfDay, endOfDay } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { formatPercent } from '@/lib/format'
 
 interface AnalyticsData {
   totalVisits: number
@@ -344,7 +345,7 @@ export default function AnalyticsPage() {
             <div>
               <p className="text-sm text-gray-400">Taxa de Conversão</p>
               <p className="text-2xl font-bold text-white">
-                {data?.conversionRate.toFixed(1)}%
+                {formatPercent(data?.conversionRate)}%
               </p>
             </div>
           </div>
@@ -407,7 +408,7 @@ export default function AnalyticsPage() {
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={(entry: any) => `${entry.source}: ${(entry.percent * 100).toFixed(0)}%`}
+                label={(entry: any) => `${entry.source}: ${formatPercent(entry.percent * 100)}%`}
                 outerRadius={80}
                 fill="#8884d8"
                 dataKey="count"
