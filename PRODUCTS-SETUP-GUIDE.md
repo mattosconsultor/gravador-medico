@@ -1,114 +1,77 @@
 # 🎯 Guia de Configuração - Produtos Intelligence
 
+## ⚠️ LEIA ISTO PRIMEIRO!
+
+**Você está vendo erro "column si.product_name does not exist"?**
+
+➡️ **Use este arquivo:** `database/PRODUCTS-INTELLIGENCE-MINIMAL.sql`
+
+Este arquivo cria TODAS as tabelas necessárias do zero e resolve o erro automaticamente.
+
+📖 **Guia completo de troubleshooting:** `SOLUCAO-DEFINITIVA.md`
+
+---
+
 ## Passo a Passo para Ativação
 
 ### 1️⃣ Executar SQL no Supabase
 
-Acesse o **SQL Editor** do Supabase e execute o arquivo completo:
+#### 🌟 Método Recomendado: MINIMAL (Setup Completo)
+
+1. Abra o **SQL Editor** do Supabase
+2. Copie **TODO** o conteúdo do arquivo:
+   ```
+   database/PRODUCTS-INTELLIGENCE-MINIMAL.sql
+   ```
+3. Cole no SQL Editor
+4. Clique em **"RUN"** (ou Ctrl+Enter)
+5. Aguarde 2-3 segundos
+
+**✅ Pronto! Tabelas criadas:**
+- `customers`
+- `products`
+- `sales`
+- `sales_items` ← Esta estava faltando!
+- Views de performance
+- Função de auto-discovery
+
+#### 📌 Alternativa: Se Você Já Tem Schema Parcial
+
+Se você já executou parcialmente outros SQLs:
+
+```
+database/PRODUCTS-INTELLIGENCE-STANDALONE.sql
+```
+
+Ou se já tem `sales` + `sales_items`:
 
 ```
 database/PRODUCTS-INTELLIGENCE.sql
 ```
 
-Este SQL irá criar:
-- ✅ Tabela `products` (catálogo oficial)
-- ✅ View `product_performance` (métricas agregadas)
-- ✅ View `product_trends` (sparklines para gráficos)
-- ✅ Função `discover_products_from_sales()` (auto-discovery)
-- ✅ Índices otimizados (GIN para JSONB)
-- ✅ RLS (Row Level Security)
-- ✅ Constraint UNIQUE no `external_id`
-
-**Tempo estimado:** 2-3 segundos
-
 ---
 
-### 2️⃣ Testar a Sincronização
+### 2️⃣ Verificar se Funcionou
 
-Após executar o SQL, teste a API de sincronização:
+Execute no Supabase SQL Editor:
 
-#### Via Terminal (cURL):
-```bash
-curl -X POST http://localhost:3000/api/admin/products/sync
+```sql
+-- Ver tabelas criadas
+SELECT table_name 
+FROM information_schema.tables 
+WHERE table_schema = 'public' 
+AND table_name IN ('sales', 'sales_items', 'products');
+
+-- Deve retornar 3 linhas
 ```
 
-#### Resposta Esperada:
-```json
-{
-  "success": true,
-  "message": "15 produtos sincronizados com sucesso",
-  "discovered_count": 15,
-  "products": [
-    {
-      "external_id": "123",
-      "name": "Gravador Médico Pro - Mensal",
-      "price": 97.00,
-      "category": "auto-detected"
-    }
-  ],
-  "synced_at": "2026-01-21T..."
-}
+**Resultado esperado:**
 ```
-
----
-
-### 3️⃣ Acessar a Interface
-
-Navegue para:
-
-```
-http://localhost:3000/admin/products
-```
-
-**O que você verá:**
-
-📊 **KPI Cards:**
-- 🏆 Produto Mais Vendido
-- ⚠️ Produto com Maior Reembolso
-- 💰 Ticket Médio
-- 📊 Health Score Médio
-
-📋 **Tabela de Produtos:**
-- Nome do produto
-- Preço
-- Vendas (últimos 30 dias)
-- Receita total
-- Taxa de Reembolso (🟢 < 1%, 🟡 < 5%, 🔴 > 5%)
-- Taxa de Conversão
-- Health Score (0-100)
-- Status (Ativo/Inativo)
-- Ações (Copiar Link, Editar)
-
-🔄 **Botão "Sincronizar com Vendas":**
-- Varre as últimas 200 vendas
-- Extrai produtos do JSONB `items`
-- Cria automaticamente produtos novos
-- Atualiza preços de produtos existentes
-
----
-
-### 4️⃣ Como Funciona a Auto-Discovery
-
-A sincronização:
-
-1. **Busca vendas** da tabela `sales` (fallback para `checkout_attempts`)
-2. **Extrai itens** do campo JSONB `items`
-3. **Deduplicada** produtos por `external_id` ou `product_id`
-4. **Upsert** na tabela `products`:
-   - Se produto não existe → **Cria**
-   - Se produto existe → **Atualiza preço**
-
-**Estrutura esperada do JSONB `items`:**
-```json
-[
-  {
-    "id": "123",
-    "title": "Gravador Médico Pro",
-    "unit_price": 97.00,
-    "quantity": 1,
-    "image_url": "https://..."
-  }
-]
+table_name
+----------
+sales
+sales_items
+products
 ```
 
 ---
