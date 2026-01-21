@@ -45,7 +45,6 @@ BEGIN
     INSERT INTO crm_leads (
       name,
       email,
-      phone,
       stage,
       value,
       source,
@@ -58,7 +57,6 @@ BEGIN
     ) VALUES (
       NEW.customer_name,
       NEW.customer_email,
-      NEW.customer_phone,
       'lead',
       NEW.total_amount,
       'Checkout - Carrinho Abandonado',
@@ -264,7 +262,7 @@ INSERT INTO crm_leads (
 SELECT DISTINCT ON (customer_email)
   customer_name,
   customer_email,
-  customer_phone,
+  NULL as phone, -- abandoned_carts pode não ter customer_phone no schema atual
   CASE 
     WHEN status = 'recovered' THEN 'won'
     ELSE 'contact'
