@@ -188,7 +188,19 @@ export default function WhatsAppInboxPage() {
   async function loadMessages(remoteJid: string) {
     setLoadingMessages(true)
     try {
+      console.log('📥 [loadMessages] Carregando mensagens para:', remoteJid)
       const data = await getWhatsAppMessages(remoteJid, 200)
+      console.log('📥 [loadMessages] Mensagens recebidas:', data.length, 'mensagens')
+      console.log('📥 [loadMessages] Detalhes:', {
+        total: data.length,
+        fromMe: data.filter(m => m.from_me).length,
+        fromThem: data.filter(m => !m.from_me).length,
+        primeiras3: data.slice(0, 3).map(m => ({
+          id: m.id.substring(0, 8),
+          content: m.content?.substring(0, 30),
+          from_me: m.from_me
+        }))
+      })
       setMessages(data)
     } catch (error) {
       console.error('❌ Erro ao carregar mensagens:', error)
