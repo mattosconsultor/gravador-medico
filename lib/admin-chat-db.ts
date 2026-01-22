@@ -232,13 +232,15 @@ export async function getAdminUsers() {
   try {
     console.log('🔍 [getAdminUsers] Iniciando busca de admins...')
     
+    // Tentar com todos os campos (incluindo is_online e avatar_url)
     const { data, error } = await supabaseAdmin
       .from('users')
       .select('id, name, email, avatar_url, role, is_online, last_seen_at')
       .eq('role', 'admin')
+      .order('is_online', { ascending: false })
       .order('name')
 
-    console.log('🔍 [getAdminUsers] Resultado da query:', { 
+    console.log('🔍 [getAdminUsers] Resultado da query completa:', { 
       dataLength: data?.length, 
       hasError: !!error,
       data: data,
@@ -246,19 +248,39 @@ export async function getAdminUsers() {
     })
 
     if (error) {
-      console.error('❌ Erro ao buscar admins:', error)
+      console.warn('⚠️ Erro ao buscar admins com campos extras:', error)
       
-      // Se der erro (ex: coluna is_online não existe), tenta sem esses campos
-      const { data: fallbackData, error: fallbackError } = await supabaseAdmin
+      // Fallback 1: Tentar sem avatar_url mas com status online
+      const { data: fallbackData1, error: fallbackError1 } = await supabaseAdmin
         .from('users')
-        .select('id, name, email, avatar_url, role')
+        .select('id, name, email, role, is_online, last_seen_at')
+        .eq('role', 'admin')
+        .order('is_online', { ascending: false })
+        .order('name')
+      
+      if (!fallbackError1 && fallbackData1) {
+        console.log('✅ Admins carregados (sem avatar_url):', fallbackData1?.length)
+        return fallbackData1.map(user => ({ ...user, avatar_url: null }))
+      }
+      
+      console.warn('⚠️ Erro no fallback 1:', fallbackError1)
+      
+      // Fallback 2: Apenas campos básicos
+      const { data: fallbackData2, error: fallbackError2 } = await supabaseAdmin
+        .from('users')
+        .select('id, name, email, role')
         .eq('role', 'admin')
         .order('name')
       
-      if (fallbackError) throw fallbackError
+      if (fallbackError2) throw fallbackError2
       
-      console.log('✅ Admins carregados (sem status online):', fallbackData?.length)
-      return fallbackData || []
+      console.log('✅ Admins carregados (campos básicos):', fallbackData2?.length)
+      return fallbackData2.map(user => ({ 
+        ...user, 
+        avatar_url: null,
+        is_online: false,
+        last_seen_at: null
+      }))
     }
     
     console.log('✅ Admins carregados (com status online):', data?.length)

@@ -110,12 +110,21 @@ export async function getWhatsAppMessages(
   remoteJid: string,
   limit = 100
 ): Promise<WhatsAppMessage[]> {
+  console.log('🔍 [getWhatsAppMessages] Buscando mensagens para:', remoteJid)
+  
   const { data, error } = await supabaseAdmin
     .from('whatsapp_messages')
     .select('*')
     .eq('remote_jid', remoteJid)
     .order('timestamp', { ascending: true })
     .limit(limit)
+
+  console.log('🔍 [getWhatsAppMessages] Resultado:', {
+    total: data?.length,
+    fromMe: data?.filter(m => m.from_me).length,
+    fromThem: data?.filter(m => !m.from_me).length,
+    error
+  })
 
   if (error) {
     console.error('❌ Erro ao buscar mensagens:', error)
