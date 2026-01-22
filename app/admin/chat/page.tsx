@@ -50,7 +50,7 @@ export default function AdminChatPage() {
         if (error || !user) {
           console.error('Erro ao obter usuário:', error)
           setLoading(false) // 👈 IMPORTANTE: Desativa loading antes de redirecionar
-          router.push('/admin/login')
+          router.push('/login')
           return
         }
 
@@ -59,7 +59,7 @@ export default function AdminChatPage() {
       } catch (err) {
         console.error('Erro ao carregar usuário:', err)
         setLoading(false) // 👈 IMPORTANTE: Desativa loading antes de redirecionar
-        router.push('/admin/login')
+        router.push('/login')
       }
     }
 
