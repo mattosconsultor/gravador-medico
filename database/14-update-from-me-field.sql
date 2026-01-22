@@ -2,32 +2,26 @@
 -- ATUALIZAR CAMPO from_me EM MENSAGENS EXISTENTES
 -- ================================================================
 
--- IMPORTANTE: Este script tenta identificar mensagens enviadas pelo sistema
--- baseado em padrões comuns. Ajuste conforme necessário.
+-- IMPORTANTE: Este script limpa mensagens antigas.
+-- A partir de agora, apenas NOVAS mensagens do webhook virão com from_me correto.
 
 -- ================================================================
--- OPÇÃO 1: Se você tiver um padrão no message_id
+-- OPÇÃO RECOMENDADA: Limpar dados antigos e começar do zero
 -- ================================================================
--- Exemplo: message_ids de mensagens enviadas costumam ter um formato diferente
--- UPDATE whatsapp_messages 
--- SET from_me = true 
--- WHERE message_id LIKE 'BAE%' OR message_id LIKE '3EB%';
+
+-- Se você quiser manter histórico, pule esta seção
+-- Se quiser começar limpo (sem mensagens antigas), descomente:
+
+-- DELETE FROM whatsapp_messages 
+-- WHERE created_at < NOW() - INTERVAL '1 day';
 
 -- ================================================================
--- OPÇÃO 2: Se você tiver o remote_jid do seu sistema
+-- ALTERNATIVA: Marcar todas como recebidas (padrão seguro)
 -- ================================================================
--- Se mensagens enviadas tiverem algum padrão no remote_jid ou outro campo
--- UPDATE whatsapp_messages 
--- SET from_me = true 
--- WHERE <sua_condição>;
-
--- ================================================================
--- OPÇÃO 3: Marcar TODAS as mensagens como recebidas (padrão seguro)
--- ================================================================
--- Isso garante que apenas NOVAS mensagens do webhook virão com from_me correto
+-- Mantém histórico mas todas antigas ficam como "recebidas"
 UPDATE whatsapp_messages 
 SET from_me = false 
-WHERE from_me IS NULL;
+WHERE from_me IS NULL OR from_me = false;
 
 -- ================================================================
 -- VERIFICAÇÃO: Contar mensagens por tipo
