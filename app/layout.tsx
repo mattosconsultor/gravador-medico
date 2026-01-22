@@ -5,6 +5,8 @@ import { headers } from 'next/headers' // ✅ Importar headers
 import AnalyticsTracker from '@/components/AnalyticsTracker'
 import CookieBanner from '@/components/CookieBanner'
 import { ToastProvider } from '@/components/ui/toast' // ✅ Provider para notificações
+import { NotificationProvider } from '@/components/NotificationProvider' // ✅ Sistema de notificações
+import { Toaster } from 'sonner' // ✅ Toast visual
 
 export const metadata: Metadata = {
   title: "Gravador Médico",
@@ -81,17 +83,21 @@ export default async function RootLayout({
         {/* End Meta Pixel Code */}
       </head>
       <body className="bg-white">
-        <ToastProvider>
-          {/* Analytics Tracker - rastreia visitas automaticamente */}
-          <Suspense fallback={null}>
-            <AnalyticsTracker city={city} country={country} region={region} />
-          </Suspense>
-          
-          {/* Banner de Consentimento LGPD */}
-          <CookieBanner />
-          
-          {children}
-        </ToastProvider>
+        <NotificationProvider>
+          <ToastProvider>
+            <Toaster position="top-right" />
+            
+            {/* Analytics Tracker - rastreia visitas automaticamente */}
+            <Suspense fallback={null}>
+              <AnalyticsTracker city={city} country={country} region={region} />
+            </Suspense>
+            
+            {/* Banner de Consentimento LGPD */}
+            <CookieBanner />
+            
+            {children}
+          </ToastProvider>
+        </NotificationProvider>
       </body>
     </html>
   )

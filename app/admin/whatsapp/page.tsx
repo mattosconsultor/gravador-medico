@@ -19,6 +19,8 @@ import ChatLayout from '@/components/whatsapp/ChatLayout'
 import ContactList from '@/components/whatsapp/ContactList'
 import MessageBubble from '@/components/whatsapp/MessageBubble'
 import { Send, Search, RefreshCw, MessageSquare } from 'lucide-react'
+import { useNotifications } from '@/components/NotificationProvider'
+import { useSearchParams } from 'next/navigation'
 
 type FilterType = 'all' | 'unread' | 'favorites' | 'groups'
 
@@ -33,6 +35,16 @@ export default function WhatsAppInboxPage() {
   const [activeFilter, setActiveFilter] = useState<FilterType>('all')
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const { addNotification } = useNotifications()
+  const searchParams = useSearchParams()
+
+  // Auto-abrir chat se vier da notificação
+  useEffect(() => {
+    const chatParam = searchParams.get('chat')
+    if (chatParam) {
+      setSelectedRemoteJid(decodeURIComponent(chatParam))
+    }
+  }, [searchParams])
 
   // Carregar conversas
   useEffect(() => {
@@ -72,6 +84,23 @@ export default function WhatsAppInboxPage() {
           console.log('📩 Nova mensagem recebida via Realtime:', payload.new)
           
           const newMessage = payload.new as WhatsAppMessage
+          
+          // 🔔 Criar notificação se NÃO for mensagem enviada por mim
+          if (!newMessage.from_me) {
+            // Buscar dados do contato para a notificação
+            const contact = conversations.find(c => c.remote_jid === newMessage.remote_jid)
+            const contactName = contact?.name || contact?.push_name || newMessage.remote_jid.split('@')[0]
+            
+            addNotification({
+              type: 'whatsapp_message',
+              title: contactName,
+              message: newMessage.content || '[Mídia]',
+              metadata: {
+                whatsapp_remote_jid: newMessage.remote_jid,
+                profile_picture_url: contact?.profile_picture_url
+              }
+            })
+          }
           
           // Se a mensagem pertence ao chat atual aberto
           if (newMessage.remote_jid === selectedRemoteJid) {

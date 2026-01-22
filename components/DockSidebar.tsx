@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Home, Compass, Wrench, ShoppingBag, User, FileText, BarChart3, ShoppingCart, MessageSquare } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
 import { useState } from "react"
+import NotificationBell from "./NotificationBell"
 
 interface NavItem {
   id: string
@@ -193,6 +194,11 @@ export default function DockSidebar() {
               )
             })}
           </nav>
+
+          {/* Notification Bell */}
+          <div className="mb-4">
+            <NotificationBell />
+          </div>
 
           {/* User Avatar */}
           <motion.button
