@@ -65,7 +65,7 @@ export default function AnalyticsTracker({ city, country, region }: AnalyticsPro
     }
   }, [pathname, searchParams, city, country, region])
 
-  // 🔥 HEARTBEAT: Atualiza last_seen a cada 30 segundos (OTIMIZADO)
+  // 🔥 HEARTBEAT: Atualiza last_seen a cada 10 segundos para manter usuário "online"
   useEffect(() => {
     const consent = localStorage.getItem('cookie_consent')
     if (consent !== 'accepted') return
@@ -84,10 +84,12 @@ export default function AnalyticsTracker({ city, country, region }: AnalyticsPro
           .eq('session_id', sessionId)
           .order('created_at', { ascending: false })
           .limit(1)
+
+        console.log('💓 Heartbeat - last_seen atualizado')
       } catch (error) {
-        // Silenciar erro para não poluir console
+        console.error('Erro no heartbeat:', error)
       }
-    }, 30000) // A cada 30 segundos (otimizado de 10s)
+    }, 10000) // A cada 10 segundos
 
     return () => clearInterval(heartbeat)
   }, [])
