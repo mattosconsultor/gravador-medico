@@ -7,15 +7,13 @@
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import type { WhatsAppMessage } from '@/lib/types/whatsapp'
-import { CheckCheck, Check, Clock, Pencil, Trash2 } from 'lucide-react'
+import { CheckCheck, Check, Clock } from 'lucide-react'
 
 interface MessageBubbleProps {
   message: WhatsAppMessage
-  onDelete?: (message: WhatsAppMessage) => void
-  onEdit?: (message: WhatsAppMessage) => void
 }
 
-export default function MessageBubble({ message, onDelete, onEdit }: MessageBubbleProps) {
+export default function MessageBubble({ message }: MessageBubbleProps) {
   const rawFromMeValue = message?.raw_payload?.key?.fromMe as
     | boolean
     | string
@@ -38,17 +36,10 @@ export default function MessageBubble({ message, onDelete, onEdit }: MessageBubb
 
   const hasRawFromMe = rawFromMeValue !== undefined && rawFromMeValue !== null
   const isFromMe = hasRawFromMe ? rawFromMeNormalized : fromMeNormalized
-  const isDeleted = message.content === '[Mensagem apagada]'
-  const canEdit =
-    isFromMe &&
-    !isDeleted &&
-    message.message_type === 'text' &&
-    typeof onEdit === 'function'
-  const canDelete = isFromMe && !isDeleted && typeof onDelete === 'function'
 
   return (
     <div
-      className={`group flex mb-2 ${isFromMe ? 'justify-end' : 'justify-start'}`}
+      className={`flex mb-2 ${isFromMe ? 'justify-end' : 'justify-start'}`}
     >
       <div
         className={`max-w-[65%] px-2 py-1.5 rounded-md shadow-sm ${
@@ -68,11 +59,7 @@ export default function MessageBubble({ message, onDelete, onEdit }: MessageBubb
 
         {/* Conteúdo de texto */}
         {message.content && (
-          <p
-            className={`text-[14.2px] whitespace-pre-wrap break-words leading-[19px] ${
-              isDeleted ? 'text-gray-300 italic' : ''
-            }`}
-          >
+          <p className="text-[14.2px] whitespace-pre-wrap break-words leading-[19px]">
             {message.content}
           </p>
         )}
@@ -86,31 +73,6 @@ export default function MessageBubble({ message, onDelete, onEdit }: MessageBubb
           >
             {format(new Date(message.timestamp), 'HH:mm', { locale: ptBR })}
           </span>
-
-          {(canEdit || canDelete) && (
-            <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-              {canEdit && (
-                <button
-                  type="button"
-                  onClick={() => onEdit?.(message)}
-                  title="Editar mensagem"
-                  className="p-0.5 rounded hover:bg-white/10"
-                >
-                  <Pencil className="w-3.5 h-3.5 text-gray-300" />
-                </button>
-              )}
-              {canDelete && (
-                <button
-                  type="button"
-                  onClick={() => onDelete?.(message)}
-                  title="Apagar para todos"
-                  className="p-0.5 rounded hover:bg-white/10"
-                >
-                  <Trash2 className="w-3.5 h-3.5 text-gray-300" />
-                </button>
-              )}
-            </div>
-          )}
 
           {isFromMe && <MessageStatus status={message.status} />}
         </div>
