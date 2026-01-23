@@ -10,20 +10,10 @@ import {
   upsertWhatsAppMessage,
   upsertWhatsAppContact,
   messageExists,
-  updateWhatsAppMessageStatus,
-  updateWhatsAppContactPresence
+  updateWhatsAppMessageStatus
 } from '@/lib/whatsapp-db'
+import { syncConversationHistory } from '@/lib/whatsapp-sync'
 import type { EvolutionMessagePayload, CreateMessageInput } from '@/lib/types/whatsapp'
-
-// ================================================================
-// CACHE DE PROTEÇÃO CONTRA DUPLICATAS
-// ================================================================
-// Map para armazenar messageIds processados recentemente
-// Previne processamento duplicado de webhooks (Evolution API pode reenviar)
-const messageCache = new Map<string, number>()
-
-// ⚠️ IMPORTANTE: Em serverless, não usar setInterval
-// A limpeza é feita individualmente por setTimeout em cada mensagem
 
 // ================================================================
 // Mapear status da Evolution API para nosso schema
@@ -49,143 +39,22 @@ function normalizeRemoteJid(remoteJid: string, remoteJidAlt?: string | null) {
   return remoteJid
 }
 
-function normalizeFromMeValue(value: unknown) {
-  return value === true || value === 'true' || value === 1 || value === '1'
-}
+async function syncConversationIfPossible(remoteJid: string, limit = 20): Promise<boolean> {
+  const apiUrl = process.env.EVOLUTION_API_URL
+  const apiKey = process.env.EVOLUTION_API_KEY
+  const instanceName = process.env.EVOLUTION_INSTANCE_NAME
 
-function shouldForwardToN8n(payload: EvolutionMessagePayload) {
-  const eventName = (payload as any)?.event?.toLowerCase()
-  if (eventName !== 'messages.upsert' && eventName !== 'messages_upsert') return false
-  const fromMeValue = (payload as any)?.data?.key?.fromMe
-  if (fromMeValue === undefined || fromMeValue === null) return false
-  return !normalizeFromMeValue(fromMeValue)
-}
-
-async function forwardToN8n(payload: EvolutionMessagePayload) {
-  const n8nUrl =
-    process.env.N8N_WEBHOOK_URL ||
-    'https://n8n-production-3342.up.railway.app/webhook/whatsapp'
-
-  if (!n8nUrl) return
+  if (!apiUrl || !apiKey || !instanceName) {
+    console.warn('[webhook] Evolution API not configured, skipping sync')
+    return false
+  }
 
   try {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 60000)
-
-    const response = await fetch(n8nUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: controller.signal
-    })
-
-    clearTimeout(timeoutId)
-
-    if (!response.ok) {
-      console.warn(`⚠️ [N8N] Forward falhou (HTTP ${response.status})`)
-    } else {
-      console.log('✅ [N8N] Forward enviado com sucesso')
-    }
+    await syncConversationHistory({ apiUrl, apiKey, instanceName }, remoteJid, limit)
+    return true
   } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      console.warn('⏱️ [N8N] Timeout ao encaminhar webhook')
-    } else {
-      console.warn('⚠️ [N8N] Erro ao encaminhar webhook:', error)
-    }
-  }
-}
-
-function extractMessageStatusUpdate(payload: any) {
-  const data = payload?.data
-  const directKey = data?.key
-  const arrayKey = Array.isArray(data) ? data[0]?.key : null
-  const nestedKey = data?.message?.key || data?.messageKey || data?.keys?.[0]
-  const key = directKey || arrayKey || nestedKey
-
-  const rawStatus =
-    data?.status ||
-    data?.update?.status ||
-    data?.updates?.[0]?.status ||
-    data?.statuses?.[0]?.status ||
-    null
-
-  const rawMessageId =
-    key?.id ||
-    data?.keyId ||
-    data?.messageId ||
-    data?.id ||
-    null
-
-  const remoteJid = normalizeRemoteJid(
-    key?.remoteJid || data?.remoteJid || data?.jid || '',
-    key?.remoteJidAlt || data?.remoteJidAlt || null
-  )
-
-  return {
-    messageId: rawMessageId,
-    status: rawStatus,
-    remoteJid: remoteJid || null
-  }
-}
-
-function extractPresenceUpdate(payload: any) {
-  const data = payload?.data || {}
-  const presences = data?.presences
-  let remoteJid =
-    data?.remoteJid ||
-    data?.id ||
-    data?.jid ||
-    data?.key?.remoteJid ||
-    null
-
-  let presence = data?.presence || null
-
-  if (!presence && presences && typeof presences === 'object') {
-    const keys = Object.keys(presences)
-    if (!remoteJid && keys.length > 0) {
-      remoteJid = keys[0]
-    }
-    presence = presences[remoteJid || keys[0]]
-  }
-
-  const presenceState =
-    presence?.lastKnownPresence ||
-    presence?.presence ||
-    presence?.state ||
-    data?.presence ||
-    data?.state ||
-    null
-
-  const lastSeenValue =
-    presence?.lastSeen ||
-    presence?.lastSeenTimestamp ||
-    data?.lastSeen ||
-    data?.lastSeenTimestamp ||
-    null
-
-  let lastSeenAt: string | undefined
-  if (typeof lastSeenValue === 'number') {
-    const ts = lastSeenValue < 1e12 ? lastSeenValue * 1000 : lastSeenValue
-    lastSeenAt = new Date(ts).toISOString()
-  } else if (typeof lastSeenValue === 'string') {
-    const parsed = Date.parse(lastSeenValue)
-    if (!Number.isNaN(parsed)) {
-      lastSeenAt = new Date(parsed).toISOString()
-    }
-  }
-
-  const presenceValue = typeof presenceState === 'string' ? presenceState.toLowerCase() : ''
-  const isTyping =
-    presenceValue === 'composing' ||
-    presenceValue === 'recording' ||
-    presenceValue === 'typing'
-  const isOnline = isTyping || presenceValue === 'available' || presenceValue === 'online'
-
-  return {
-    remoteJid,
-    isTyping,
-    isOnline,
-    lastSeenAt
+    console.warn('[webhook] Failed to sync conversation:', error)
+    return false
   }
 }
 
@@ -392,112 +261,61 @@ function extractMessageContent(message: any, messageType: string) {
 export async function POST(request: NextRequest) {
   try {
     const payload: EvolutionMessagePayload = await request.json()
-    const eventName = (payload as any)?.event?.toLowerCase?.() || ''
 
-    // Log simples de entrada
-    console.log(`📥 Webhook: ${eventName}`)
+    const isUpdateEvent = payload.event === 'messages.update'
 
-    // ================================================================
-    // PROTEÇÃO ANTI-DUPLICATA: Verificar cache ANTES de processar
-    // ================================================================
-    const messageId = (payload as any)?.data?.key?.id
+    console.log('📥 Webhook recebido:', {
+      event: payload.event,
+      instance: payload.instance,
+      remoteJid: payload.data.key.remoteJid,
+      remoteJidAlt: (payload.data.key as any)?.remoteJidAlt,
+      fromMe: payload.data.key.fromMe,
+      messageType: payload.data.messageType,
+      fullKey: payload.data.key
+    })
     
-    if (messageId && messageCache.has(messageId)) {
-      const cachedTime = messageCache.get(messageId)!
-      const elapsedSeconds = Math.floor((Date.now() - cachedTime) / 1000)
-      
-      console.log(`⚠️ [DUPLICATA] ${messageId.substring(0, 20)}... (${elapsedSeconds}s)`)
-      
-      return NextResponse.json({ 
-        success: true, 
-        status: 'ignored', 
-        reason: 'duplicate'
-      })
-    }
-
-    // Adicionar ao cache se for mensagem nova (apenas para messages.upsert)
-    if (messageId && (eventName === 'messages.upsert' || eventName === 'messages_upsert')) {
-      messageCache.set(messageId, Date.now())
-      
-      // Auto-limpeza individual após 60 segundos
-      setTimeout(() => {
-        messageCache.delete(messageId)
-      }, 60000)
-    }
-
-    // ⚡ EARLY RETURN: Processar eventos de status/presença ANTES (mais rápido)
-    // Atualizar status de mensagens (checks)
-    if (eventName === 'messages.update' || eventName === 'messages_update') {
-      const update = extractMessageStatusUpdate(payload)
-      if (!update.messageId || !update.status) {
-        return NextResponse.json({
-          success: true,
-          message: 'Atualizacao de status ignorada (dados insuficientes)'
-        })
-      }
-
-      const mappedStatus = mapEvolutionStatus(update.status)
-      if (!mappedStatus) {
-        return NextResponse.json({
-          success: true,
-          message: 'Atualizacao de status ignorada (status invalido)'
-        })
-      }
-
-      await updateWhatsAppMessageStatus(update.messageId, mappedStatus)
-
-      return NextResponse.json({
-        success: true,
-        message: 'Status atualizado com sucesso'
-      })
-    }
-
-    // Atualizar presenca (online, visto por ultimo, digitando)
-    if (eventName === 'presence.update' || eventName === 'presence_update') {
-      const presence = extractPresenceUpdate(payload)
-      if (!presence.remoteJid) {
-        return NextResponse.json({
-          success: true,
-          message: 'Presenca ignorada (remoteJid ausente)'
-        })
-      }
-
-      const now = new Date().toISOString()
-      await updateWhatsAppContactPresence({
-        remote_jid: presence.remoteJid,
-        is_online: presence.isOnline,
-        last_seen_at: presence.lastSeenAt || now,
-        is_typing: presence.isTyping,
-        typing_updated_at: presence.isTyping ? now : null
-      })
-
-      return NextResponse.json({
-        success: true,
-        message: 'Presenca atualizada com sucesso'
-      })
-    }
+    console.log('🔍 [DEBUG from_me] Valor recebido:', payload.data.key.fromMe, typeof payload.data.key.fromMe)
 
     // Ignorar eventos que não são de mensagens
-    if (eventName !== 'messages.upsert' && eventName !== 'messages_upsert') {
+    if (payload.event !== 'messages.upsert' && payload.event !== 'messages.update') {
       return NextResponse.json({ 
         success: true, 
-        message: 'Evento ignorado (não é messages.upsert)' 
+        message: 'Evento ignorado (nao e messages.upsert/update)' 
       })
     }
 
     const { key, message, messageType, messageTimestamp, pushName, status } = payload.data
-    const normalizedRemoteJid = normalizeRemoteJid(
-      key.remoteJid,
-      (key as any).remoteJidAlt
-    )
+    const rawKey = key as any
+    const normalizedRemoteJid = normalizeRemoteJid(key.remoteJid, rawKey?.remoteJidAlt)
 
     // Verificar se mensagem já existe (evitar duplicatas)
     const exists = await messageExists(key.id)
     if (exists) {
       console.log('⚠️ Mensagem já existe:', key.id)
+      if (isUpdateEvent && status) {
+        try {
+          await updateWhatsAppMessageStatus(key.id, mapEvolutionStatus(status) || 'sent')
+        } catch (updateError) {
+          console.warn('⚠️ Falha ao atualizar status da mensagem:', updateError)
+        }
+      }
       return NextResponse.json({ 
         success: true, 
         message: 'Mensagem já existe' 
+      })
+    }
+
+    const hasMessagePayload =
+      message && typeof message === 'object' && Object.keys(message).length > 0
+    const hasMessageType = typeof messageType === 'string' && messageType.length > 0
+
+    if (isUpdateEvent && (!hasMessagePayload || !hasMessageType)) {
+      const synced = await syncConversationIfPossible(normalizedRemoteJid, 30)
+      return NextResponse.json({
+        success: true,
+        message: synced
+          ? 'Update sem payload completo, sincronizacao executada'
+          : 'Update sem payload completo, sync ignorado'
       })
     }
 
@@ -506,15 +324,22 @@ export async function POST(request: NextRequest) {
 
     // ================================================================
     // PASSO 1: Buscar foto de perfil (NÃO CRÍTICO - nunca trava)
+    // Usa endpoint /chat/findContacts confirmado via teste curl
+    // IMPORTANTE: Passa participant para identificar remetente em grupos
     // ================================================================
     const profilePictureUrl = await fetchProfilePicture(
-      normalizedRemoteJid, 
-      key.participant,
+      normalizedRemoteJid,
+      key.participant,  // Para mensagens de grupo
       payload.data
     )
+    
+    if (profilePictureUrl) {
+      console.log(`✅ Foto obtida: ${profilePictureUrl.substring(0, 50)}...`)
+    }
 
     // ================================================================
     // PASSO 2: UPSERT do contato PRIMEIRO (resolver FK constraint)
+    // GARANTIA: Sempre salva o contato, mesmo sem foto
     // ================================================================
     try {
       await upsertWhatsAppContact({
@@ -523,6 +348,7 @@ export async function POST(request: NextRequest) {
         profile_picture_url: profilePictureUrl || undefined,
         is_group: normalizedRemoteJid.includes('@g.us')
       })
+      console.log(`✅ Contato salvo: ${normalizedRemoteJid}`)
     } catch (contactError) {
       console.error('❌ Erro ao salvar contato:', contactError)
       throw contactError
@@ -532,14 +358,13 @@ export async function POST(request: NextRequest) {
     // PASSO 3: INSERT da mensagem (agora o FK existe)
     // ================================================================
     
-    // 🔧 Garantir que from_me seja boolean
+    // 🔧 CORREÇÃO: Garantir que from_me seja boolean (pode vir como string ou outro tipo)
     const fromMeValue = (payload.data.key as any).fromMe
     const fromMeBoolean = fromMeValue === true || fromMeValue === 'true' || fromMeValue === 1
     
-    console.log(`📝 from_me: ${fromMeValue} (${typeof fromMeValue}) → ${fromMeBoolean}`)
+    console.log('🔍 [DEBUG CONVERSÃO] from_me original:', fromMeValue, typeof fromMeValue)
+    console.log('🔍 [DEBUG CONVERSÃO] from_me convertido:', fromMeBoolean, typeof fromMeBoolean)
     
-    const mappedStatus = mapEvolutionStatus(status) ?? (fromMeBoolean ? 'sent' : undefined)
-
     const messageInput: CreateMessageInput = {
       message_id: key.id,
       remote_jid: normalizedRemoteJid,
@@ -548,18 +373,17 @@ export async function POST(request: NextRequest) {
       media_url,
       caption,
       from_me: fromMeBoolean,
-      timestamp: new Date(messageTimestamp * 1000).toISOString(),
-      status: mappedStatus,
+      timestamp: typeof messageTimestamp === 'number'
+        ? new Date(messageTimestamp * 1000).toISOString()
+        : new Date().toISOString(),
+      status: mapEvolutionStatus(status),
       raw_payload: payload.data
     }
+    
+    console.log('🔍 [DEBUG SAVE] Salvando mensagem com from_me:', messageInput.from_me, typeof messageInput.from_me)
 
     const savedMessage = await upsertWhatsAppMessage(messageInput)
-    console.log(`✅ Mensagem salva: ${savedMessage.id} | from_me: ${savedMessage.from_me}`)
-
-    // ⚡ Forward para N8N de forma assíncrona (não bloqueia resposta)
-    if (shouldForwardToN8n(payload)) {
-      void forwardToN8n(payload)
-    }
+    console.log(`✅ Mensagem salva: ${savedMessage.id}, from_me final: ${savedMessage.from_me}`)
 
     return NextResponse.json({
       success: true,
@@ -588,9 +412,4 @@ export async function GET() {
     webhook: 'whatsapp-evolution-api-v2',
     timestamp: new Date().toISOString()
   })
-}
-
-// Configuração de timeout para o route handler
-export const config = {
-  maxDuration: 60
 }
